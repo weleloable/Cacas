@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-#EAM marca
+#EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
 # Configuración de la app
 st.set_page_config(
