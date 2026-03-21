@@ -1,0 +1,25 @@
+{
+  "viajes": [
+    {
+      "id": 1,
+      "nombre": "COLUNGAZO",
+      "admin": "Dudu",
+      "fecha_creacion": "2026-03-21 16:04:10",
+      "activo": true,
+      "categorias": [
+        "Cacas",
+        "Bebidas"
+      ],
+      "usuarios": {
+        "Dudu": {
+          "cacas": 0,
+          "pises": 0,
+          "cervezas": 0,
+          "vinos": 0,
+          "vermouths": 0,
+          "copazos": 0
+        }
+      }
+    }
+  ]
+}
