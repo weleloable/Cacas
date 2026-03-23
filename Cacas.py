@@ -148,7 +148,7 @@ def finalizar_viaje(viaje_id):
 
 # Título principal
 st.title("💧 Gotita")
-st.write("Controla los eventos de tu viaje de forma divertida")
+#st.write("Controla los eventos de tu viaje de forma divertida")
 
 # Sidebar para navegación
 page = st.sidebar.radio(
