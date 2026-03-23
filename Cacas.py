@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from supabase import create_client, Client
+import hashlib
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
@@ -86,12 +87,15 @@ def obtener_viaje_activo():
             return viaje
     return None
 
-def añadir_usuario_a_viaje(viaje_id, nombre_usuario):
-    """Añade un usuario a un viaje específico con los eventos según las categorías"""
+def añadir_usuario_a_viaje(viaje_id, nombre_usuario, password):
+    """Añade un usuario a un viaje específico con los eventos según las categorías y establece una contraseña"""
     datos = cargar_datos()
     for viaje in datos["viajes"]:
         if viaje["id"] == viaje_id:
             if nombre_usuario not in viaje["usuarios"]:
+                # Hash de la contraseña
+                hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                
                 # Inicializar eventos según las categorías del viaje
                 eventos_usuario = {}
                 for categoria in viaje.get("categorias", ["Cacas"]):
@@ -99,7 +103,10 @@ def añadir_usuario_a_viaje(viaje_id, nombre_usuario):
                         for evento_key in CATEGORIAS[categoria]["eventos"]:
                             eventos_usuario[evento_key] = 0
                 
-                viaje["usuarios"][nombre_usuario] = eventos_usuario
+                viaje["usuarios"][nombre_usuario] = {
+                    "password": hashed_password,
+                    "eventos": eventos_usuario
+                }
             guardar_datos(datos)
             return True
     return False
@@ -110,7 +117,7 @@ def registrar_evento(viaje_id, usuario, tipo_evento):
     for viaje in datos["viajes"]:
         if viaje["id"] == viaje_id:
             if usuario in viaje["usuarios"]:
-                viaje["usuarios"][usuario][tipo_evento] += 1
+                viaje["usuarios"][usuario]["eventos"][tipo_evento] += 1
                 guardar_datos(datos)
                 return True
     return False
@@ -122,8 +129,8 @@ def eliminar_evento(viaje_id, usuario, tipo_evento):
         if viaje["id"] == viaje_id:
             if usuario in viaje["usuarios"]:
                 # No permite que baje de 0
-                if viaje["usuarios"][usuario][tipo_evento] > 0:
-                    viaje["usuarios"][usuario][tipo_evento] -= 1
+                if viaje["usuarios"][usuario]["eventos"][tipo_evento] > 0:
+                    viaje["usuarios"][usuario]["eventos"][tipo_evento] -= 1
                     guardar_datos(datos)
                     return True
     return False
@@ -213,16 +220,17 @@ elif page == "📋 Unirse a Viaje":
         
         with col2:
             nombre_usuario = st.text_input("Tu nombre:", placeholder="Ej: María")
+            password = st.text_input("Contraseña:", type="password", placeholder="Crea una contraseña")
         
         if st.button("Unirme al Viaje", type="primary", use_container_width=True):
-            if nombre_usuario:
-                if añadir_usuario_a_viaje(viaje_seleccionado["id"], nombre_usuario):
+            if nombre_usuario and password:
+                if añadir_usuario_a_viaje(viaje_seleccionado["id"], nombre_usuario, password):
                     st.success(f"✅ ¡Te has unido al viaje '{viaje_seleccionado['nombre']}'!")
                     st.balloons()
                 else:
-                    st.error("Error al unirse al viaje")
+                    st.error("Error al unirse al viaje o usuario ya existe")
             else:
-                st.error("Por favor ingresa tu nombre")
+                st.error("Por favor ingresa tu nombre y una contraseña")
     else:
         st.warning("No hay viajes activos. ¡Crea uno primero!")
 
@@ -255,6 +263,10 @@ elif page == "📊 Mi Viaje":
         viaje = next((v for v in datos["viajes"] if v["id"] == viaje_obj["id"]), None)
         
         if viaje and viaje["usuarios"]:
+            # Inicializar session_state para logins
+            if 'logged_in' not in st.session_state:
+                st.session_state.logged_in = {}
+            
             # Mantener la selección de usuario en session_state
             if st.session_state.selected_usuario not in viaje["usuarios"]:
                 st.session_state.selected_usuario = list(viaje["usuarios"].keys())[0]
@@ -269,46 +281,62 @@ elif page == "📊 Mi Viaje":
             # Actualizar session_state con el usuario seleccionado
             st.session_state.selected_usuario = usuario
             
-            st.subheader(f"Eventos de {usuario}")
-            
-            # Mostrar eventos dinámicamente según las categorías
-            categorias = viaje.get("categorias", ["Cacas"])
-            
-            for categoria in categorias:
-                if categoria in CATEGORIAS:
-                    st.subheader(f"{CATEGORIAS[categoria]['emoji']} {categoria}")
-                    
-                    eventos = CATEGORIAS[categoria]["eventos"]
-                    num_eventos = len(eventos)
-                    cols = st.columns(num_eventos)
-                    
-                    for idx, (evento_key, evento_info) in enumerate(eventos.items()):
-                        with cols[idx]:
-                            contador = viaje["usuarios"][usuario].get(evento_key, 0)
-                            st.metric(
-                                f"{evento_info['emoji']} {evento_info['nombre']}",
-                                contador
-                            )
-                            
-                            if st.button(f"➕ {evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
-                                registrar_evento(viaje["id"], usuario, evento_key)
-                                st.rerun()
-                            
-                            if contador > 0:
-                                if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=True, key=f"btn_del_{evento_key}"):
-                                    eliminar_evento(viaje["id"], usuario, evento_key)
+            # Verificar si el usuario está logueado para este viaje
+            viaje_key = f"{viaje['id']}_{usuario}"
+            if st.session_state.logged_in.get(viaje_key, False):
+                # Usuario logueado, mostrar eventos
+                st.subheader(f"Eventos de {usuario}")
+                
+                # Mostrar eventos dinámicamente según las categorías
+                categorias = viaje.get("categorias", ["Cacas"])
+                
+                for categoria in categorias:
+                    if categoria in CATEGORIAS:
+                        st.subheader(f"{CATEGORIAS[categoria]['emoji']} {categoria}")
+                        
+                        eventos = CATEGORIAS[categoria]["eventos"]
+                        num_eventos = len(eventos)
+                        cols = st.columns(num_eventos)
+                        
+                        for idx, (evento_key, evento_info) in enumerate(eventos.items()):
+                            with cols[idx]:
+                                contador = viaje["usuarios"][usuario]["eventos"].get(evento_key, 0)
+                                st.metric(
+                                    f"{evento_info['emoji']} {evento_info['nombre']}",
+                                    contador
+                                )
+                                
+                                if st.button(f"➕ {evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
+                                    registrar_evento(viaje["id"], usuario, evento_key)
                                     st.rerun()
-            
-            st.divider()
-            
-            # Admin controls - Solo el usuario admin puede finalizar
-            if usuario == viaje["admin"]:
-                st.subheader("⚙️ Controles de Admin")
-                st.info(f"Eres el admin de este viaje. Solo tú puedes finalizarlo.")
-                if st.button("🏁 Finalizar Viaje", type="secondary"):
-                    finalizar_viaje(viaje["id"])
-                    st.success("Viaje finalizado. Ve a Reportes para ver las estadísticas.")
-                    st.rerun()
+                                
+                                if contador > 0:
+                                    if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=True, key=f"btn_del_{evento_key}"):
+                                        eliminar_evento(viaje["id"], usuario, evento_key)
+                                        st.rerun()
+                
+                st.divider()
+                
+                # Admin controls - Solo el usuario admin puede finalizar
+                if usuario == viaje["admin"]:
+                    st.subheader("⚙️ Controles de Admin")
+                    st.info(f"Eres el admin de este viaje. Solo tú puedes finalizarlo.")
+                    if st.button("🏁 Finalizar Viaje", type="secondary"):
+                        finalizar_viaje(viaje["id"])
+                        st.success("Viaje finalizado. Ve a Reportes para ver las estadísticas.")
+                        st.rerun()
+            else:
+                # Pedir contraseña
+                st.subheader(f"Autenticación para {usuario}")
+                password_input = st.text_input("Ingresa tu contraseña:", type="password", key=f"password_{viaje_key}")
+                if st.button("Iniciar Sesión", key=f"login_{viaje_key}"):
+                    hashed_input = hashlib.sha256(password_input.encode()).hexdigest()
+                    if hashed_input == viaje["usuarios"][usuario]["password"]:
+                        st.session_state.logged_in[viaje_key] = True
+                        st.success("¡Sesión iniciada! Recarga la página para ver tus eventos.")
+                        st.rerun()
+                    else:
+                        st.error("Contraseña incorrecta")
         else:
             st.warning("No hay usuarios registrados en este viaje")
     else:
@@ -339,9 +367,9 @@ elif page == "📈 Reportes":
         import pandas as pd
         
         resultados = []
-        for usuario, eventos in viaje["usuarios"].items():
+        for usuario, data in viaje["usuarios"].items():
             resultado_usuario = {"Usuario": usuario}
-            resultado_usuario.update(eventos)
+            resultado_usuario.update(data["eventos"])
             resultados.append(resultado_usuario)
         
         # Mostrar tablas dinámicamente según las categorías
