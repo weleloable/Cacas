@@ -102,14 +102,14 @@ def añadir_usuario_a_viaje(viaje_id, nombre_usuario, password):
             if nombre_usuario not in viaje["usuarios"]:
                 # Hash de la contraseña
                 hashed_password = hashlib.sha256(password.encode()).hexdigest()
-                
+
                 # Inicializar eventos según las categorías del viaje
                 eventos_usuario = {}
                 for categoria in viaje.get("categorias", ["Cacas"]):
                     if categoria in CATEGORIAS:
                         for evento_key in CATEGORIAS[categoria]["eventos"]:
                             eventos_usuario[evento_key] = 0
-                
+
                 viaje["usuarios"][nombre_usuario] = {
                     "password": hashed_password,
                     "eventos": eventos_usuario
@@ -190,8 +190,11 @@ def generar_prompt_resumen(viaje, categoria, ranking):
     ultimo = ranking[-1]
 
     prompt = (
+        f"Eres un narrador divertido y respetuoso. En español escribe un párrafo breve (70-120 palabras) "
         f"Eres un narrador divertido y graciosete. En español escribe un párrafo breve (50-100 palabras) "
         f"para el reporte de viaje '{viaje_nombre}' en la categoría '{categoria}', incluyendo cada evento: {evento_lista}. "
+        f"Menciona claramente al líder (más alto) y al último (más bajo), con humor suave. "
+        f"No uses insultos graves ni lenguaje ofensivo. "
         f"Menciona claramente al líder (más alto) y al último (más bajo), con humor picante. "
         f"Si lo consideras oportuno, utiliza insultos graves ni lenguaje ofensivo. "
         f"Ejemplo: 'En la categoría {categoria}, el más cagon del viaje...' "
@@ -262,21 +265,21 @@ if page == "🏠 Inicio":
 # Página: Crear Viaje
 elif page == "✈️ Crear Viaje":
     st.header("Crear Nuevo Viaje")
-    
+
     col1, col2 = st.columns(2)
     with col1:
         nombre_viaje = st.text_input("Nombre del viaje:", placeholder="Ej: Viaje a Cancún")
         nombre_admin = st.text_input("Tu nombre (Admin):", placeholder="Ej: Juan")
-    
+
     st.subheader("Selecciona las categorías que aplican en este viaje:")
     categorias_seleccionadas = []
     cols = st.columns(len(CATEGORIAS))
-    
+
     for i, (categoria_nombre, categoria_info) in enumerate(CATEGORIAS.items()):
         with cols[i]:
             if st.checkbox(f"{categoria_info['emoji']} {categoria_nombre}", value=True, key=f"cat_{categoria_nombre}"):
                 categorias_seleccionadas.append(categoria_nombre)
-    
+
     if st.button("Crear Viaje", type="primary", use_container_width=True):
         if nombre_viaje and nombre_admin:
             if not categorias_seleccionadas:
@@ -291,10 +294,10 @@ elif page == "✈️ Crear Viaje":
 # Página: Unirse a Viaje
 elif page == "📋 Unirse a Viaje":
     st.header("Unirse a un Viaje")
-    
+
     datos = cargar_datos()
     viajes_activos = [v for v in datos["viajes"] if v["activo"]]
-    
+
     if viajes_activos:
         col1, col2 = st.columns(2)
         with col1:
@@ -303,11 +306,11 @@ elif page == "📋 Unirse a Viaje":
                 options=viajes_activos,
                 format_func=lambda x: f"{x['nombre']} (ID: {x['id']}) - Admin: {x['admin']}"
             )
-        
+
         with col2:
             nombre_usuario = st.text_input("Tu nombre:", placeholder="Ej: María")
             password = st.text_input("Contraseña:", type="password", placeholder="Crea una contraseña")
-        
+
         if st.button("Unirme al Viaje", type="primary", use_container_width=True):
             if nombre_usuario and password:
                 if añadir_usuario_a_viaje(viaje_seleccionado["id"], nombre_usuario, password):
@@ -323,17 +326,17 @@ elif page == "📋 Unirse a Viaje":
 # Página: Mi Viaje
 elif page == "📊 Mi Viaje":
     st.header("Mi Viaje - Registrar Gotitas")
-    
+
     datos = cargar_datos()
     viajes_activos = [v for v in datos["viajes"] if v["activo"]]
-    
+
     if viajes_activos:
         # Mantener la selección de viaje en session_state
         if 'selected_viaje_id' not in st.session_state:
             st.session_state.selected_viaje_id = viajes_activos[0]["id"]
         if 'selected_usuario' not in st.session_state:
             st.session_state.selected_usuario = None
-        
+
         viaje_obj = st.selectbox(
             "Selecciona tu viaje:",
             options=viajes_activos,
@@ -341,49 +344,49 @@ elif page == "📊 Mi Viaje":
             index=next((i for i, v in enumerate(viajes_activos) if v['id'] == st.session_state.selected_viaje_id), 0),
             key="viaje_select"
         )
-        
+
         # Actualizar session_state con el viaje seleccionado
         st.session_state.selected_viaje_id = viaje_obj["id"]
-        
+
         # Recargar datos para obtener el viaje actualizado
         viaje = next((v for v in datos["viajes"] if v["id"] == viaje_obj["id"]), None)
-        
+
         if viaje and viaje["usuarios"]:
             # Inicializar session_state para logins
             if 'logged_in' not in st.session_state:
                 st.session_state.logged_in = {}
-            
+
             # Mantener la selección de usuario en session_state
             if st.session_state.selected_usuario not in viaje["usuarios"]:
                 st.session_state.selected_usuario = list(viaje["usuarios"].keys())[0]
-            
+
             usuario = st.selectbox(
                 "Selecciona tu usuario:",
                 options=list(viaje["usuarios"].keys()),
                 index=list(viaje["usuarios"].keys()).index(st.session_state.selected_usuario) if st.session_state.selected_usuario in viaje["usuarios"] else 0,
                 key="usuario_select"
             )
-            
+
             # Actualizar session_state con el usuario seleccionado
             st.session_state.selected_usuario = usuario
-            
+
             # Verificar si el usuario está logueado para este viaje
             viaje_key = f"{viaje['id']}_{usuario}"
             if st.session_state.logged_in.get(viaje_key, False):
                 # Usuario logueado, mostrar eventos
                 st.subheader(f"Eventos de {usuario}")
-                
+
                 # Mostrar eventos dinámicamente según las categorías
                 categorias = viaje.get("categorias", ["Cacas"])
-                
+
                 for categoria in categorias:
                     if categoria in CATEGORIAS:
                         st.subheader(f"{CATEGORIAS[categoria]['emoji']} {categoria}")
-                        
+
                         eventos = CATEGORIAS[categoria]["eventos"]
                         num_eventos = len(eventos)
                         cols = st.columns(num_eventos)
-                        
+
                         for idx, (evento_key, evento_info) in enumerate(eventos.items()):
                             with cols[idx]:
                                 contador = viaje["usuarios"][usuario]["eventos"].get(evento_key, 0)
@@ -400,9 +403,9 @@ elif page == "📊 Mi Viaje":
                                         if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=False, key=f"btn_del_{evento_key}"):
                                             eliminar_evento(viaje["id"], usuario, evento_key)
                                             st.rerun()
-                
+
                 st.divider()
-                
+
                 # Admin controls - Solo el usuario admin puede finalizar
                 if usuario == viaje["admin"]:
                     st.subheader("⚙️ Controles de Admin")
@@ -431,55 +434,55 @@ elif page == "📊 Mi Viaje":
 # Página: Reportes
 elif page == "📈 Reportes":
     st.header("Reportes Finales")
-    
+
     datos = cargar_datos()
     viajes_finalizados = [v for v in datos["viajes"] if not v["activo"]]
-    
+
     if viajes_finalizados:
         viaje = st.selectbox(
             "Selecciona un viaje finalizado:",
             options=viajes_finalizados,
             format_func=lambda x: f"{x['nombre']} (Finalizado: {x.get('fecha_finalizacion', 'N/A')})"
         )
-        
+
         st.subheader(f"Reporte Final - {viaje['nombre']}")
         st.write(f"**Admin:** {viaje['admin']}")
         st.write(f"**Creado:** {viaje['fecha_creacion']}")
         st.write(f"**Finalizado:** {viaje.get('fecha_finalizacion', 'N/A')}")
-        
+
         st.divider()
 
         # Crear tabla de resultados
         import pandas as pd
-        
+
         resultados = []
         for usuario, data in viaje["usuarios"].items():
             resultado_usuario = {"Usuario": usuario}
             resultado_usuario.update(data["eventos"])
             resultados.append(resultado_usuario)
-        
+
         # Mostrar tablas dinámicamente según las categorías
         categorias = viaje.get("categorias", ["Cacas"])
-        
+
         # Crear columnas para mostrar las tablas lado a lado
         cols_count = len(categorias)
         cols = st.columns(cols_count)
-        
+
         for idx, categoria in enumerate(categorias):
             if categoria in CATEGORIAS:
                 with cols[idx]:
                     st.subheader(f"{CATEGORIAS[categoria]['emoji']} TOTAL {categoria.upper()}")
-                    
+
                     # Crear tabla para esta categoría
                     eventos_keys = list(CATEGORIAS[categoria]["eventos"].keys())
-                    
+
                     # Si hay múltiples eventos en la categoría, mostrar una tabla por evento
                     if len(eventos_keys) > 1:
                         for evento_key in eventos_keys:
                             df_evento = pd.DataFrame(resultados)[["Usuario", evento_key]].copy()
                             df_evento = df_evento.sort_values(evento_key, ascending=False)
                             df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
-                            
+
                             evento_nombre = CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]
                             evento_emoji = CATEGORIAS[categoria]["eventos"][evento_key]["emoji"]
                             st.write(f"**{evento_emoji} {evento_nombre}**")
@@ -492,30 +495,28 @@ elif page == "📈 Reportes":
                         df_evento = df_evento.sort_values(evento_key, ascending=False)
                         df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
                         st.dataframe(df_evento, use_container_width=False, hide_index=True)
-                    
-                # Generar resumen IA por categoría
-                viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
-                if st.button("🧠 Generar resumen del viaje", type="primary"):
-                    with st.spinner("Generando narrativa con AI..."):
-                        for categoria in categorias:
-                            if categoria in CATEGORIAS:
-                                ranking = generar_ranking_categoria(viaje, categoria)
-                                viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
 
-                        # Guardar texto generado en Supabase en campo json
-                        try:
-                            supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
-                            st.success("Se generó el reporte IA y se guardó en la base de datos.")
-                        except Exception as e:
-                            st.error(f"Error guardando reporte IA en Supabase: {e}")
+        # Generar resumen IA por categoría
+        viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
+        if st.button("🧠 Generar resumen IA para este viaje", type="primary"):
+            with st.spinner("Generando narrativa con AI..."):
+                for categoria in categorias:
+                    if categoria in CATEGORIAS:
+                        ranking = generar_ranking_categoria(viaje, categoria)
+                        viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
 
-                if viaje_reporte_llm:
-                    st.subheader("📝 Narrativa generada con IA")
-                    for categoria, texto in viaje_reporte_llm.items():
-                        st.markdown(f"**{categoria}**")
-                        st.write(texto)
-        
+                # Guardar texto generado en Supabase en campo json
+                try:
+                    supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
+                    st.success("Se generó el reporte IA y se guardó en la base de datos.")
+                except Exception as e:
+                    st.error(f"Error guardando reporte IA en Supabase: {e}")
+
+        if viaje_reporte_llm:
+            st.subheader("📝 Narrativa generada con IA")
+            for categoria, texto in viaje_reporte_llm.items():
+                st.markdown(f"**{categoria}**")
+                st.write(texto)
 
     else:
         st.info("No hay viajes finalizados aún")
-
