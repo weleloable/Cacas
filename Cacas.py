@@ -306,12 +306,12 @@ elif page == "📊 Mi Viaje":
                                 with row_cols[0]:
                                     st.metric("Cantidad", contador)
                                 with row_cols[1]:
-                                    if st.button("➕", use_container_width=True, key=f"btn_add_{evento_key}"):
+                                    if st.button(f"{evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
                                         registrar_evento(viaje["id"], usuario, evento_key)
                                         st.rerun()
                                 with row_cols[2]:
                                     if contador > 0:
-                                        if st.button("🗑️", use_container_width=True, key=f"btn_del_{evento_key}"):
+                                        if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=False, key=f"btn_del_{evento_key}"):
                                             eliminar_evento(viaje["id"], usuario, evento_key)
                                             st.rerun()
                 
