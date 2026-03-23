@@ -47,11 +47,8 @@ CATEGORIAS = {
 def cargar_datos():
     """Carga los datos desde Supabase"""
     try:
-        response = supabase.table('app_data').select('data').eq('id', 1).execute()
-        if response.data:
-            return response.data[0]['data']
-        else:
-            return {"viajes": []}
+        response = supabase.table('viajes').select('*').execute()
+        return {"viajes": response.data}
     except Exception as e:
         st.error(f"Error cargando datos: {e}")
         return {"viajes": []}
@@ -59,7 +56,9 @@ def cargar_datos():
 def guardar_datos(datos):
     """Guarda los datos en Supabase"""
     try:
-        supabase.table('app_data').upsert({'id': 1, 'data': datos}).execute()
+        # Upsert cada viaje
+        for viaje in datos["viajes"]:
+            supabase.table('viajes').upsert(viaje).execute()
     except Exception as e:
         st.error(f"Error guardando datos: {e}")
 
