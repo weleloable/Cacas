@@ -449,6 +449,28 @@ elif page == "📈 Reportes":
         
         st.divider()
         
+        # Generar resumen IA por categoría
+        viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
+        if st.button("🧠 Generar resumen del viaje", type="primary"):
+            with st.spinner("Generando narrativa con AI..."):
+                for categoria in categorias:
+                    if categoria in CATEGORIAS:
+                        ranking = generar_ranking_categoria(viaje, categoria)
+                        viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
+
+                # Guardar texto generado en Supabase en campo json
+                try:
+                    supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
+                    st.success("Se generó el reporte IA y se guardó en la base de datos.")
+                except Exception as e:
+                    st.error(f"Error guardando reporte IA en Supabase: {e}")
+
+        if viaje_reporte_llm:
+            st.subheader("📝 Narrativa generada con IA")
+            for categoria, texto in viaje_reporte_llm.items():
+                st.markdown(f"**{categoria}**")
+                st.write(texto)
+
         # Crear tabla de resultados
         import pandas as pd
         
@@ -493,27 +515,7 @@ elif page == "📈 Reportes":
                         df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
                         st.dataframe(df_evento, use_container_width=False, hide_index=True)
 
-        # Generar resumen IA por categoría
-        viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
-        if st.button("🧠 Generar resumen IA para este viaje", type="primary"):
-            with st.spinner("Generando narrativa con AI..."):
-                for categoria in categorias:
-                    if categoria in CATEGORIAS:
-                        ranking = generar_ranking_categoria(viaje, categoria)
-                        viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
-
-                # Guardar texto generado en Supabase en campo json
-                try:
-                    supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
-                    st.success("Se generó el reporte IA y se guardó en la base de datos.")
-                except Exception as e:
-                    st.error(f"Error guardando reporte IA en Supabase: {e}")
-
-        if viaje_reporte_llm:
-            st.subheader("📝 Narrativa generada con IA")
-            for categoria, texto in viaje_reporte_llm.items():
-                st.markdown(f"**{categoria}**")
-                st.write(texto)
+        
 
     else:
         st.info("No hay viajes finalizados aún")
