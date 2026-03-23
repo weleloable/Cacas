@@ -147,7 +147,7 @@ def finalizar_viaje(viaje_id):
     return None
 
 # Título principal
-st.title("💩 Cacas & Pises")
+st.title("💧 Gotita")
 st.write("Controla los eventos de tu viaje de forma divertida")
 
 # Sidebar para navegación
@@ -158,18 +158,18 @@ page = st.sidebar.radio(
 
 # Página: Inicio
 if page == "🏠 Inicio":
-    st.header("¡Bienvenido a Cacas & Pises!")
+    st.header("¡Bienvenido a Gotita!")
     st.write("""
     Esta aplicación te permite:
     - 🏖️ Crear viajes con tus amigos
     - 👥 Registrarte en un viaje activo
-    - 💩 Contar tus eventos diarios
+    - 💧 Contar tus gotitas
     - 📊 Ver estadísticas finales del viaje
     
     **¿Cómo funciona?**
     1. Un admin crea un nuevo viaje
     2. Otros usuarios se unen al viaje
-    3. Cada uno registra sus eventos (Cacas y Pises)
+    3. Cada uno registra sus eventos (Cacas, Pises, ...)
     4. Al final del viaje, se generan las estadísticas
     """)
 
@@ -198,7 +198,7 @@ elif page == "✈️ Crear Viaje":
             else:
                 viaje = crear_viaje(nombre_viaje, nombre_admin, categorias_seleccionadas)
                 st.success(f"✅ ¡Viaje '{nombre_viaje}' creado exitosamente!")
-                st.info(f"ID del viaje: {viaje['id']} - Comparte este número con tus amigos")
+                st.info(f"ID del viaje: {viaje['id']} - Comparte este viaje con tus amigos")
         else:
             st.error("Por favor completa todos los campos")
 
@@ -236,7 +236,7 @@ elif page == "📋 Unirse a Viaje":
 
 # Página: Mi Viaje
 elif page == "📊 Mi Viaje":
-    st.header("Mi Viaje - Registrar Eventos")
+    st.header("Mi Viaje - Registrar Gotitas")
     
     datos = cargar_datos()
     viajes_activos = [v for v in datos["viajes"] if v["activo"]]
