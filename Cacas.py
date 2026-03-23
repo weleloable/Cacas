@@ -221,6 +221,13 @@ def generar_resumen_local(prompt):
     if pipeline is None:
         return "No disponible: instala transformers y torch para usar modelo local."
 
+    # Añadimos instrucción fuerte para evitar inventar usuarios
+    prompt_instrucciones = (
+        "Por favor, asegúrate de usar solo los usuarios listados en 'Datos por usuario' "
+        "y no inventes nuevos nombres. Escribe solo el resumen." 
+    )
+    prompt_final = prompt + "\n\n" + prompt_instrucciones
+
     # Modelo ligero: no necesitas GPU, aunque será más lento en CPU
     modelo = "gpt2"
     try:
@@ -231,9 +238,17 @@ def generar_resumen_local(prompt):
             do_sample=True,
             temperature=0.7,
             top_p=0.95,
+            return_full_text=False,
         )
-        salida = gen(prompt, max_new_tokens=120, num_return_sequences=1)
-        return salida[0]["generated_text"].strip()
+        salida = gen(prompt_final, max_new_tokens=120, num_return_sequences=1)
+        texto = salida[0]["generated_text"].strip()
+
+        # Si el modelo responde repitiendo el prompt, recorta el prefijo
+        if texto.startswith(prompt.split('\n')[0]):
+            # asegurar no mostrar prompt por completo
+            texto = texto.replace(prompt, "", 1).strip()
+
+        return texto
     except Exception as e:
         # Opción fallback cuando el primer modelo no está disponible
         try:
@@ -244,9 +259,13 @@ def generar_resumen_local(prompt):
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.95,
+                return_full_text=False,
             )
-            salida = gen(prompt, max_new_tokens=90, num_return_sequences=1)
-            return salida[0]["generated_text"].strip()
+            salida = gen(prompt_final, max_new_tokens=90, num_return_sequences=1)
+            texto = salida[0]["generated_text"].strip()
+            if texto.startswith(prompt.split('\n')[0]):
+                texto = texto.replace(prompt, "", 1).strip()
+            return texto
         except Exception as e2:
             return f"Error generando texto local: {e} | fallback: {e2}"
 
@@ -526,7 +545,7 @@ elif page == "📈 Reportes":
         # Generar resumen IA por categoría
         viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
         if st.button("🧠 Generar resumen de este viaje", type="primary"):
-            with st.spinner("Generando narrativa con AI..."):
+            with st.spinner("Generando narrativa..."):
                 if not isinstance(viaje_reporte_llm, dict):
                     viaje_reporte_llm = {}
 
@@ -542,12 +561,12 @@ elif page == "📈 Reportes":
                 # Guardar texto generado en Supabase en campo json
                 try:
                     supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
-                    st.success("Se generó el reporte IA y se guardó en la base de datos.")
+                    st.success("Se generó el reporte y se guardó en la base de datos.")
                 except Exception as e:
-                    st.error(f"Error guardando reporte IA en Supabase: {e}")
+                    st.error(f"Error guardando reporte en Supabase: {e}")
 
         if viaje_reporte_llm:
-            st.subheader("📝 Narrativa generada con IA")
+            st.subheader("📝 Narrativa del viaje")
             for categoria, texto in viaje_reporte_llm.items():
                 st.markdown(f"**{categoria}**")
                 st.write(texto)
