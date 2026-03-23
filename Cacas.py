@@ -154,12 +154,11 @@ def finalizar_viaje(viaje_id):
             return viaje
     return None
 
-# --- Funciones de IA para reportes ----------------------------------------
-def obtener_api_key_openai():
-    # Se puede configurar en Streamlit settings o variable de entorno
-    if isinstance(st.secrets.get("openai"), dict):
-        return st.secrets["openai"].get("key")
-    return os.getenv("OPENAI_API_KEY")
+def obtener_api_key_groq():
+    # Configurar en st.secrets o env var
+    if isinstance(st.secrets.get("groq"), dict):
+        return st.secrets["groq"].get("key")
+    return os.getenv("GROQ_API_KEY")
 
 
 def generar_ranking_categoria(viaje, categoria):
@@ -197,7 +196,7 @@ def generar_prompt_resumen(viaje, categoria, ranking):
         f"Si lo consideras oportuno, usa insultos graves y lenguaje ofensivo. "
         f"Menciona claramente al líder (más alto) y al último (más bajo), con humor picante. "
         f"Ejemplo: 'En la categoría {categoria}, el más cagon del viaje...' "
-        f"Incluye nombres reales y un remate final estilo 'que la próxima aventura sea aún más legendaria'.\n\n"
+        f"No incluyas nombres presentes en los datos y un remate final estilo 'que la próxima aventura sea aún más legendaria'.\n\n"
     )
 
     prompt += "Datos por usuario:\n"
@@ -208,49 +207,40 @@ def generar_prompt_resumen(viaje, categoria, ranking):
     return prompt
 
 
-# Opción local (gratuita si se ejecuta en tu propio entorno)
+# Integración con Groq (gratuito online)
 try:
-    from transformers import pipeline
-    import torch
+    from groq import Groq
 except ImportError:
-    pipeline = None
-    torch = None
+    Groq = None
 
 
 def generar_resumen_local(prompt):
     if pipeline is None:
         return "No disponible: instala transformers y torch para usar modelo local."
 
-    # Añadimos instrucción fuerte para evitar inventar usuarios
-    prompt_instrucciones = (
-        "Por favor, asegúrate de usar solo los usuarios listados en 'Datos por usuario' "
-        "y no inventes nuevos nombres. Escribe solo el resumen." 
-    )
-    prompt_final = prompt + "\n\n" + prompt_instrucciones
-
-    # Modelo ligero: no necesitas GPU, aunque será más lento en CPU
-    modelo = "gpt2"
+    # Usar T5 para mejor generación de texto coherente
+    modelo = "t5-small"
     try:
         gen = pipeline(
-            "text-generation",
+            "text2text-generation",
             model=modelo,
             device=-1,
+            max_length=150,
             do_sample=True,
-            temperature=0.7,
-            top_p=0.95,
-            return_full_text=False,
+            temperature=0.8,
+            top_p=0.9,
         )
-        salida = gen(prompt_final, max_new_tokens=120, num_return_sequences=1)
+        # T5 espera input formateado, pero para generación libre, usar directamente
+        salida = gen(prompt, max_length=150, num_return_sequences=1)
         texto = salida[0]["generated_text"].strip()
 
-        # Si el modelo responde repitiendo el prompt, recorta el prefijo
-        if texto.startswith(prompt.split('\n')[0]):
-            # asegurar no mostrar prompt por completo
-            texto = texto.replace(prompt, "", 1).strip()
+        # Limpiar si repite partes del prompt
+        if "Por favor, asegúrate" in texto:
+            texto = texto.split("Por favor, asegúrate")[0].strip()
 
         return texto
     except Exception as e:
-        # Opción fallback cuando el primer modelo no está disponible
+        # Fallback a GPT-2 si T5 falla
         try:
             gen = pipeline(
                 "text-generation",
@@ -261,24 +251,44 @@ def generar_resumen_local(prompt):
                 top_p=0.95,
                 return_full_text=False,
             )
-            salida = gen(prompt_final, max_new_tokens=90, num_return_sequences=1)
+            prompt_corto = prompt[:500]  # Limitar prompt para evitar repetición
+            salida = gen(prompt_corto, max_new_tokens=80, num_return_sequences=1)
             texto = salida[0]["generated_text"].strip()
-            if texto.startswith(prompt.split('\n')[0]):
-                texto = texto.replace(prompt, "", 1).strip()
+            if "Por favor, asegúrate" in texto:
+                texto = texto.split("Por favor, asegúrate")[0].strip()
             return texto
         except Exception as e2:
             return f"Error generando texto local: {e} | fallback: {e2}"
 
 
 def generar_resumen_llm(viaje, categoria, ranking):
-    """Genera texto usando LLM local en Streamlit Cloud (sin OpenAI)."""
+    """Genera texto usando Groq (gratuito online)."""
     prompt = generar_prompt_resumen(viaje, categoria, ranking)
 
-    local_text = generar_resumen_local(prompt)
-    if "No disponible" in local_text or local_text.startswith("Error"):
-        return f"No se pudo generar local. Asegura transformers/torch instalados: {local_text}"
+    api_key = obtener_api_key_groq()
+    if not api_key or Groq is None:
+        return "Configura GROQ_API_KEY en st.secrets o env var, e instala groq."
 
-    return local_text
+    try:
+        client = Groq(api_key=api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un narrador divertido y respetuoso. Genera texto en español."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model="llama3-8b-8192",  # Modelo gratuito en Groq
+            max_tokens=200,
+            temperature=0.8
+        )
+        return chat_completion.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error con Groq: {e}"
 
 
 # Título principal
