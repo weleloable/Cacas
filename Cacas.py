@@ -241,30 +241,12 @@ def generar_resumen_local(prompt):
 
 
 def generar_resumen_llm(viaje, categoria, ranking):
+    """Genera texto usando LLM local en Streamlit Cloud (sin OpenAI)."""
     prompt = generar_prompt_resumen(viaje, categoria, ranking)
 
-    # Prioridad: OpenAI si está configurado
-    api_key = obtener_api_key_openai()
-    if api_key and openai is not None:
-        try:
-            openai.api_key = api_key
-            completion = openai.ChatCompletion.create(
-                model="gpt-4.1-mini",
-                messages=[{"role": "system", "content": "Eres un generador de reportes ligeros y humorísticos."},
-                          {"role": "user", "content": prompt}],
-                max_tokens=180,
-                temperature=0.8
-            )
-            return completion.choices[0].message.content.strip()
-        except Exception as e:
-            # Si falla OpenAI, cae al fallback local
-            fallback = generar_resumen_local(prompt)
-            return f"(OpenAI falló: {e})\n{fallback}"
-
-    # Si no hay o no funciona OpenAI, usa modelo local
     local_text = generar_resumen_local(prompt)
     if "No disponible" in local_text or local_text.startswith("Error"):
-        return f"Key de OpenAI no configurada o no disponible.\n{local_text}"
+        return f"No se pudo generar local. Asegura transformers/torch instalados: {local_text}"
 
     return local_text
 
