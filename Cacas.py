@@ -222,22 +222,35 @@ def generar_resumen_local(prompt):
         return "No disponible: instala transformers y torch para usar modelo local."
 
     # Modelo ligero: no necesitas GPU, aunque será más lento en CPU
-    modelo = "google/flan-t5-small"
+    modelo = "gpt2"
     try:
         gen = pipeline(
-            "text2text-generation",
+            "text-generation",
             model=modelo,
             device=-1,
-            max_length=256,
+            max_length=220,
             do_sample=True,
             temperature=0.7,
             top_p=0.95,
-            eos_token_id=1,
         )
-        salida = gen(prompt, max_length=180, num_return_sequences=1)
+        salida = gen(prompt, max_length=220, num_return_sequences=1)
         return salida[0]["generated_text"].strip()
     except Exception as e:
-        return f"Error generando texto local: {e}"
+        # Opción fallback cuando el primer modelo no está disponible
+        try:
+            gen = pipeline(
+                "text-generation",
+                model="sshleifer/tiny-gpt2",
+                device=-1,
+                max_length=160,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.95,
+            )
+            salida = gen(prompt, max_length=160, num_return_sequences=1)
+            return salida[0]["generated_text"].strip()
+        except Exception as e2:
+            return f"Error generando texto local: {e} | fallback: {e2}"
 
 
 def generar_resumen_llm(viaje, categoria, ranking):
