@@ -190,10 +190,10 @@ def generar_prompt_resumen(viaje, categoria, ranking):
     ultimo = ranking[-1]
 
     prompt = (
-        f"Eres un narrador divertido y respetuoso. En español escribe un párrafo breve (70-120 palabras) "
+        f"Eres un narrador divertido y graciosete. En español escribe un párrafo breve (50-100 palabras) "
         f"para el reporte de viaje '{viaje_nombre}' en la categoría '{categoria}', incluyendo cada evento: {evento_lista}. "
-        f"Menciona claramente al líder (más alto) y al último (más bajo), con humor suave. "
-        f"No uses insultos graves ni lenguaje ofensivo. "
+        f"Menciona claramente al líder (más alto) y al último (más bajo), con humor picante. "
+        f"Si lo consideras oportuno, utiliza insultos graves ni lenguaje ofensivo. "
         f"Ejemplo: 'En la categoría {categoria}, el más cagon del viaje...' "
         f"Incluye nombres reales y un remate final estilo 'que la próxima aventura sea aún más legendaria'.\n\n"
     )
