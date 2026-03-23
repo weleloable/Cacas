@@ -12,6 +12,7 @@ except ImportError:
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
+
 # Configuración de Supabase
 try:
     SUPABASE_URL = st.secrets["supabase"]["url"]
@@ -207,30 +208,65 @@ def generar_prompt_resumen(viaje, categoria, ranking):
     return prompt
 
 
+# Opción local (gratuita si se ejecuta en tu propio entorno)
+try:
+    from transformers import pipeline
+    import torch
+except ImportError:
+    pipeline = None
+    torch = None
+
+
+def generar_resumen_local(prompt):
+    if pipeline is None:
+        return "No disponible: instala transformers y torch para usar modelo local."
+
+    # Modelo ligero: no necesitas GPU, aunque será más lento en CPU
+    modelo = "google/flan-t5-small"
+    try:
+        gen = pipeline(
+            "text2text-generation",
+            model=modelo,
+            device=-1,
+            max_length=256,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.95,
+            eos_token_id=1,
+        )
+        salida = gen(prompt, max_length=180, num_return_sequences=1)
+        return salida[0]["generated_text"].strip()
+    except Exception as e:
+        return f"Error generando texto local: {e}"
+
+
 def generar_resumen_llm(viaje, categoria, ranking):
-    if openai is None:
-        return "Módulo openai no instalado. Instala openai con pip para habilitar IA."
-
-    api_key = obtener_api_key_openai()
-    if not api_key:
-        return "Key de OpenAI no configurada. Define OPENAI_API_KEY o st.secrets['openai']['key']."
-
-    openai.api_key = api_key
-
     prompt = generar_prompt_resumen(viaje, categoria, ranking)
 
-    try:
-        completion = openai.ChatCompletion.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "system", "content": "Eres un generador de reportes ligeros y humorísticos."},
-                      {"role": "user", "content": prompt}],
-            max_tokens=180,
-            temperature=0.8
-        )
+    # Prioridad: OpenAI si está configurado
+    api_key = obtener_api_key_openai()
+    if api_key and openai is not None:
+        try:
+            openai.api_key = api_key
+            completion = openai.ChatCompletion.create(
+                model="gpt-4.1-mini",
+                messages=[{"role": "system", "content": "Eres un generador de reportes ligeros y humorísticos."},
+                          {"role": "user", "content": prompt}],
+                max_tokens=180,
+                temperature=0.8
+            )
+            return completion.choices[0].message.content.strip()
+        except Exception as e:
+            # Si falla OpenAI, cae al fallback local
+            fallback = generar_resumen_local(prompt)
+            return f"(OpenAI falló: {e})\n{fallback}"
 
-        return completion.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Error generando texto con IA: {e}"
+    # Si no hay o no funciona OpenAI, usa modelo local
+    local_text = generar_resumen_local(prompt)
+    if "No disponible" in local_text or local_text.startswith("Error"):
+        return f"Key de OpenAI no configurada o no disponible.\n{local_text}"
+
+    return local_text
 
 
 # Título principal

@@ -3,3 +3,5 @@ pandas>=2.1.0
 protobuf<4.0
 supabase
 openai
+transformers>=4.35.0
+torch>=2.0.0
