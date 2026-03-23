@@ -500,10 +500,17 @@ elif page == "📈 Reportes":
         viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
         if st.button("🧠 Generar resumen IA para este viaje", type="primary"):
             with st.spinner("Generando narrativa con AI..."):
+                if not isinstance(viaje_reporte_llm, dict):
+                    viaje_reporte_llm = {}
+
                 for categoria in categorias:
                     if categoria in CATEGORIAS:
-                        ranking = generar_ranking_categoria(viaje, categoria)
-                        viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
+                        try:
+                            ranking = generar_ranking_categoria(viaje, categoria)
+                            texto_categoria = generar_resumen_llm(viaje, categoria, ranking)
+                            viaje_reporte_llm[categoria] = texto_categoria
+                        except Exception as e:
+                            viaje_reporte_llm[categoria] = f"Error generando resumen: {e}"
 
                 # Guardar texto generado en Supabase en campo json
                 try:
