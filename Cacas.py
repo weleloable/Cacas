@@ -26,8 +26,8 @@ st.set_page_config(
 
 # Definición de categorías y eventos
 CATEGORIAS = {
-    "Cacas": {
-        "emoji": "💩",
+    "Gotitas": {
+        "emoji": "💧",
         "eventos": {
             "cacas": {"nombre": "Cacas", "emoji": "💩"},
             "pises": {"nombre": "Pises", "emoji": "💧"}
