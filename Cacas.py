@@ -1,16 +1,20 @@
 import streamlit as st
-import json
-import os
 from datetime import datetime
-from pathlib import Path
 from supabase import create_client, Client
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
 # Configuración de Supabase
-SUPABASE_URL = st.secrets["supabase"]["url"]
-SUPABASE_KEY = st.secrets["supabase"]["key"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
+try:
+    SUPABASE_URL = st.secrets["supabase"]["url"]
+    SUPABASE_KEY = st.secrets["supabase"]["key"]
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except KeyError:
+    st.error("Configura las secrets de Supabase en Streamlit Cloud o localmente.")
+    st.stop()
+except Exception as e:
+    st.error(f"Error conectando a Supabase: {e}")
+    st.stop() 
 
 # Configuración de la app
 st.set_page_config(
@@ -18,6 +22,26 @@ st.set_page_config(
     page_icon="💩",
     layout="wide"
 )
+
+# Definición de categorías y eventos
+CATEGORIAS = {
+    "Cacas": {
+        "emoji": "💩",
+        "eventos": {
+            "cacas": {"nombre": "Cacas", "emoji": "💩"},
+            "pises": {"nombre": "Pises", "emoji": "💧"}
+        }
+    },
+    "Bebidas": {
+        "emoji": "🍺",
+        "eventos": {
+            "cervezas": {"nombre": "Cerveza", "emoji": "🍺"},
+            "vinos": {"nombre": "Copa de vino", "emoji": "🍷"},
+            "vermouths": {"nombre": "Vermouth", "emoji": "🍸"},
+            "copazos": {"nombre": "Copazo", "emoji": "🥃"}
+        }
+    }
+}
 
 # Funciones auxiliares
 def cargar_datos():
