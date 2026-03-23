@@ -306,12 +306,12 @@ elif page == "📊 Mi Viaje":
                                     contador
                                 )
                                 
-                                if st.button(f"➕ {evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
+                                if st.button(f"{evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
                                     registrar_evento(viaje["id"], usuario, evento_key)
                                     st.rerun()
                                 
                                 if contador > 0:
-                                    if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=True, key=f"btn_del_{evento_key}"):
+                                    if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=False, key=f"btn_del_{evento_key}"):
                                         eliminar_evento(viaje["id"], usuario, evento_key)
                                         st.rerun()
                 
