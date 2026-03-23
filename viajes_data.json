@@ -12,10 +12,10 @@
       ],
       "usuarios": {
         "Dudu": {
-          "cacas": 0,
+          "cacas": 1,
           "pises": 0,
           "cervezas": 0,
-          "vinos": 0,
+          "vinos": 1,
           "vermouths": 0,
           "copazos": 0
         }

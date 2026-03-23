@@ -3,8 +3,14 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
+from supabase import create_client, Client
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
+
+# Configuración de Supabase
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
 # Configuración de la app
 st.set_page_config(
@@ -13,41 +19,25 @@ st.set_page_config(
     layout="wide"
 )
 
-# Archivo de almacenamiento de datos
-DATA_FILE = "viajes_data.json"
-
-# Definición de categorías y eventos
-CATEGORIAS = {
-    "Cacas": {
-        "emoji": "💩",
-        "eventos": {
-            "cacas": {"nombre": "Cacas", "emoji": "💩"},
-            "pises": {"nombre": "Pises", "emoji": "💧"}
-        }
-    },
-    "Bebidas": {
-        "emoji": "🍺",
-        "eventos": {
-            "cervezas": {"nombre": "Cerveza", "emoji": "🍺"},
-            "vinos": {"nombre": "Copa de vino", "emoji": "🍷"},
-            "vermouths": {"nombre": "Vermouth", "emoji": "🍸"},
-            "copazos": {"nombre": "Copazo", "emoji": "🥃"}
-        }
-    }
-}
-
 # Funciones auxiliares
 def cargar_datos():
-    """Carga los datos de los viajes desde el archivo JSON"""
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r') as f:
-            return json.load(f)
-    return {"viajes": []}
+    """Carga los datos desde Supabase"""
+    try:
+        response = supabase.table('app_data').select('data').eq('id', 1).execute()
+        if response.data:
+            return response.data[0]['data']
+        else:
+            return {"viajes": []}
+    except Exception as e:
+        st.error(f"Error cargando datos: {e}")
+        return {"viajes": []}
 
 def guardar_datos(datos):
-    """Guarda los datos de los viajes en el archivo JSON"""
-    with open(DATA_FILE, 'w') as f:
-        json.dump(datos, f, indent=2)
+    """Guarda los datos en Supabase"""
+    try:
+        supabase.table('app_data').upsert({'id': 1, 'data': datos}).execute()
+    except Exception as e:
+        st.error(f"Error guardando datos: {e}")
 
 def crear_viaje(nombre_viaje, admin_user, categorias_seleccionadas):
     """Crea un nuevo viaje con categorías específicas"""
