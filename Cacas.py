@@ -1,7 +1,14 @@
+import os
 import streamlit as st
 from datetime import datetime
 from supabase import create_client, Client
 import hashlib
+
+# Integración opcional con OpenAI (ChatGPT / Gemini compatibles vía API OpenAI)
+try:
+    import openai
+except ImportError:
+    openai = None
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
@@ -145,6 +152,85 @@ def finalizar_viaje(viaje_id):
             guardar_datos(datos)
             return viaje
     return None
+
+# --- Funciones de IA para reportes ----------------------------------------
+def obtener_api_key_openai():
+    # Se puede configurar en Streamlit settings o variable de entorno
+    if isinstance(st.secrets.get("openai"), dict):
+        return st.secrets["openai"].get("key")
+    return os.getenv("OPENAI_API_KEY")
+
+
+def generar_ranking_categoria(viaje, categoria):
+    event_keys = list(CATEGORIAS.get(categoria, {}).get("eventos", {}).keys())
+    ranking = []
+
+    for usuario, info in viaje.get("usuarios", {}).items():
+        total_cat = sum(info.get("eventos", {}).get(k, 0) for k in event_keys)
+        ranking.append({
+            "usuario": usuario,
+            "total": total_cat,
+            "detalles": {k: info.get("eventos", {}).get(k, 0) for k in event_keys}
+        })
+
+    ranking.sort(key=lambda x: x["total"], reverse=True)
+    return ranking
+
+
+def generar_prompt_resumen(viaje, categoria, ranking):
+    if not ranking:
+        return "Sin datos suficientes para generar un resumen."
+
+    viaje_nombre = viaje.get("nombre", "este viaje")
+    texto_evento = CATEGORIAS.get(categoria, {}).get("eventos", {})
+    evento_lista = ", ".join([evt.get("nombre", k) for k, evt in texto_evento.items()])
+
+    top1 = ranking[0]
+    top2 = ranking[1] if len(ranking) > 1 else None
+    ultimo = ranking[-1]
+
+    prompt = (
+        f"Eres un narrador divertido y respetuoso. En español escribe un párrafo breve (70-120 palabras) "
+        f"para el reporte de viaje '{viaje_nombre}' en la categoría '{categoria}', incluyendo cada evento: {evento_lista}. "
+        f"Menciona claramente al líder (más alto) y al último (más bajo), con humor suave. "
+        f"No uses insultos graves ni lenguaje ofensivo. "
+        f"Ejemplo: 'En la categoría {categoria}, el más cagon del viaje...' "
+        f"Incluye nombres reales y un remate final estilo 'que la próxima aventura sea aún más legendaria'.\n\n"
+    )
+
+    prompt += "Datos por usuario:\n"
+    for item in ranking:
+        details = ", ".join([f"{k}: {v}" for k, v in item["detalles"].items()])
+        prompt += f"- {item['usuario']}: total {item['total']} ({details})\n"
+
+    return prompt
+
+
+def generar_resumen_llm(viaje, categoria, ranking):
+    if openai is None:
+        return "Módulo openai no instalado. Instala openai con pip para habilitar IA."
+
+    api_key = obtener_api_key_openai()
+    if not api_key:
+        return "Key de OpenAI no configurada. Define OPENAI_API_KEY o st.secrets['openai']['key']."
+
+    openai.api_key = api_key
+
+    prompt = generar_prompt_resumen(viaje, categoria, ranking)
+
+    try:
+        completion = openai.ChatCompletion.create(
+            model="gpt-4.1-mini",
+            messages=[{"role": "system", "content": "Eres un generador de reportes ligeros y humorísticos."},
+                      {"role": "user", "content": prompt}],
+            max_tokens=180,
+            temperature=0.8
+        )
+
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error generando texto con IA: {e}"
+
 
 # Título principal
 st.title("💧 Gotita")
@@ -406,6 +492,29 @@ elif page == "📈 Reportes":
                         df_evento = df_evento.sort_values(evento_key, ascending=False)
                         df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
                         st.dataframe(df_evento, use_container_width=False, hide_index=True)
+
+        # Generar resumen IA por categoría
+        viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
+        if st.button("🧠 Generar resumen IA para este viaje", type="primary"):
+            with st.spinner("Generando narrativa con AI..."):
+                for categoria in categorias:
+                    if categoria in CATEGORIAS:
+                        ranking = generar_ranking_categoria(viaje, categoria)
+                        viaje_reporte_llm[categoria] = generar_resumen_llm(viaje, categoria, ranking)
+
+                # Guardar texto generado en Supabase en campo json
+                try:
+                    supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
+                    st.success("Se generó el reporte IA y se guardó en la base de datos.")
+                except Exception as e:
+                    st.error(f"Error guardando reporte IA en Supabase: {e}")
+
+        if viaje_reporte_llm:
+            st.subheader("📝 Narrativa generada con IA")
+            for categoria, texto in viaje_reporte_llm.items():
+                st.markdown(f"**{categoria}**")
+                st.write(texto)
+
     else:
         st.info("No hay viajes finalizados aún")
 
