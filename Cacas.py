@@ -172,7 +172,7 @@ def generar_resumen_llm(viaje, categoria):
 #st.title("💧 Gotita")
 
 # Creamos dos columnas. El ratio [0.2, 1] hace que la primera sea pequeña para la imagen
-col_logo, col_titulo = st.columns([0.2, 1])
+col_logo, col_titulo = st.columns([0.7, 1])
 
 with col_logo:
     st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
