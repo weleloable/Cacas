@@ -41,6 +41,13 @@ session = login_form(
 
 st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
 
+# REFUERZO: Si acabamos de volver de Google, forzamos un segundo de espera 
+# o un rerun para que Streamlit procese la cookie de sesión.
+if session:
+    if "user" not in st.session_state:
+        st.session_state.user = session['user']
+        st.rerun()
+
 # Mejora en la detección: si no hay sesión o no hay usuario, PARAR
 if session is None or 'user' not in session:
     st.markdown("""
