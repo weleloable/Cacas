@@ -66,7 +66,7 @@ if not st.session_state.user:
         auth_data = supabase.auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
-                "redirect_to": "https://cacas.streamlit.app", # ASEGÚRATE QUE ES ESTA
+                "redirect_to": "https://cacaculopedopis.streamlit.app/", # ASEGÚRATE QUE ES ESTA
                 "skip_nonce_check": True
             }
         })
