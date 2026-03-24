@@ -143,8 +143,8 @@ def generar_resumen_llm(viaje, categoria):
     
     # Prompt optimizado (Humor ácido pero sin "insultos graves" para evitar baneos)
     prompt = (
-        f"Eres un cronista sarcástico y divertido. Escribe un párrafo breve (60 palabras) "
-        f"sobre la categoría '{categoria}' en el viaje '{viaje['nombre']}'. "
+        f"Eres un cronista sarcástico y divertido. Escribe un párrafo breve (200 palabras) "
+        f"sobre cada Evento '{CATEGORIAS[categoria]["eventos"]}' la categoría '{categoria}' en el viaje '{viaje['nombre']}'. "
         f"Usa un tono de 'roast' (humor ácido y picante). "
         f"Menciona quién es el líder indiscutible y quién ha dado vergüenza ajena por su bajo rendimiento. "
         f"No uses nombres reales si no quieres, usa los datos: \n{ranking_str}\n "
