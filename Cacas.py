@@ -34,36 +34,58 @@ except Exception as e:
     st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
 
-# --- 3. AUTENTICACIÓN  ---
-# --- 3. LOGIN NATIVO (SIN LIBRERÍAS EXTRA) ---
+# --- 3. AUTENTICACIÓN ROBUSTA (MANUAL) ---
+
+# 1. Inicializar el usuario en el estado de la sesión
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Intentamos recuperar sesión si existe en la URL
-if not st.session_state.user:
-    curr_session = supabase.auth.get_session()
-    if curr_session and curr_session.user:
-        st.session_state.user = curr_session.user
+# 2. CAPTURAR EL TOKEN DE LA URL (Esto es lo que estaba fallando)
+# Supabase envía el token tras el '#' (fragmento), Streamlit a veces no lo ve fácil.
+# Intentamos forzar la lectura del fragmento de URL
+query_params = st.query_params
 
-# Si seguimos sin usuario, mostramos botón manual
+# Si detectamos que hay un error o un access_token en la URL, intentamos loguear
+if not st.session_state.user:
+    try:
+        # El cliente de Supabase busca automáticamente en la URL y en LocalStorage
+        user_res = supabase.auth.get_user()
+        if user_res and user_res.user:
+            st.session_state.user = user_res.user
+    except:
+        pass
+
+# 3. PANTALLA DE LOGIN (Si no hay usuario)
 if not st.session_state.user:
     st.title("Gotita 💧")
-    if st.button("Entrar con Google"):
-        # Esto genera la URL de Google directamente
-        res = supabase.auth.sign_in_with_oauth({
+    st.write("Bienvenido. Para acceder a tus viajes, identifica tu cuenta de Google.")
+    
+    # Creamos el enlace de login manualmente para tener control total
+    if st.button("Iniciar Sesión con Google", type="primary"):
+        # Generamos la URL de autenticación
+        auth_data = supabase.auth.sign_in_with_oauth({
             "provider": "google",
             "options": {
-                "redirect_to": "https://cacas.streamlit.app"
+                "redirect_to": "https://cacas.streamlit.app", # ASEGÚRATE QUE ES ESTA
+                "skip_nonce_check": True
             }
         })
-        # Redirigimos manualmente
-        st.write(f"Redirigiendo... [Pulsa aquí si no carga]({res.url})")
+        # Redirección directa
+        st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_data.url}">', unsafe_allow_html=True)
+        st.write(f"Redirigiendo a Google... [Si no carga, pulsa aquí]({auth_data.url})")
         st.stop()
     st.stop()
 
-# Si hay usuario, extraemos datos
+# 4. SI LLEGAMOS AQUÍ, HAY USUARIO
 USER_EMAIL = st.session_state.user.email
-USER_NAME = st.session_state.user.user_metadata.get('full_name', 'Usuario')
+USER_NAME = st.session_state.user.user_metadata.get('full_name', USER_EMAIL.split('@')[0])
+
+with st.sidebar:
+    st.success(f"Conectado como {USER_NAME}")
+    if st.button("Cerrar Sesión"):
+        supabase.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
