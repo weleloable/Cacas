@@ -6,6 +6,9 @@ from streamlit_supabase_auth import login_form, logout_button
 import hashlib
 import pandas as pd
 import plotly.express as px
+# Obtener la URL actual de la app dinámicamente
+import urllib.parse
+
 
 # Esto te mostrará si hay algo en la URL que la app no está pillando
 st.write("Parámetros en la URL:", st.query_params)
@@ -33,11 +36,19 @@ except Exception as e:
 
 # --- 3. AUTENTICACIÓN CON GOOGLE ---
 # Esto bloquea la app hasta que el usuario se loguee
+# Intenta detectar la URL donde estás corriendo
+current_url = st.secrets.get("BASE_URL", "https://cacaculopedopis.streamlit.app/")
 session = login_form(
     url=SUPABASE_URL,
     apiKey=SUPABASE_KEY,
     providers=["google"],
+    # Forzamos que el flujo sepa a dónde volver
+    redirectTo=current_url 
 )
+
+# DEBUG: Si esto sigue saliendo vacío tras loguearte, 
+# es que Supabase no está recibiendo bien el Client ID/Secret
+st.write("Estado de sesión:", "Conectado" if session else "Desconectado")
 
 st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
 
