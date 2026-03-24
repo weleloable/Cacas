@@ -42,8 +42,6 @@ session = login_form(
     url=SUPABASE_URL,
     apiKey=SUPABASE_KEY,
     providers=["google"],
-    # Forzamos que el flujo sepa a dónde volver
-    redirectTo=current_url 
 )
 
 # DEBUG: Si esto sigue saliendo vacío tras loguearte, 
