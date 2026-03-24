@@ -175,7 +175,7 @@ page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Uni
 if page == "🏠 Inicio":
     st.header("¡Bienvenido a Gotita!")
     st.info("Registra los hitos más... orgánicos de tus viajes con amigos.")
-    st.image("https://icons8.com/icon/3GPNVKXRHLb1/drop", width=100)
+    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
     
     st.header("¡Bienvenido a Gotita!")
     st.write("""
