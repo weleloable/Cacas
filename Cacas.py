@@ -159,7 +159,8 @@ def generar_resumen_llm(viaje, categoria):
                 {"role": "system", "content": "Eres un narrador de comedias tipo 'Roast' en español."},
                 {"role": "user", "content": prompt}
             ],
-            model="llama3-8b-8192",
+            # CAMBIA ESTA LÍNEA:
+            model="llama-3.3-70b-versatile", 
             temperature=0.8
         )
         return response.choices[0].message.content.strip()
