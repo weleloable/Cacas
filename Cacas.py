@@ -298,7 +298,6 @@ elif page == "📈 Reportes":
         df_base = pd.DataFrame(res)
 
         st.subheader("🍰 Reparto del Pastel")
-        st.write("Clasificación por evento y su distribución:")
 
         # 2. Iterar por cada evento disponible en el viaje
         # Sacamos la lista de columnas que son eventos (todas menos 'Usuario')
@@ -323,14 +322,23 @@ elif page == "📈 Reportes":
             # Datos específicos del evento ordenados
             df_evento = df_base[["Usuario", col_evento]].sort_values(by=col_evento, ascending=False)
             
+            # --- Dentro del bucle de eventos en Reportes ---
             with c_tabla:
-                # Mostramos la tabla limpia sin índice
+                # Mostramos la tabla con configuración de columnas para ajustar tamaño
                 st.dataframe(
                     df_evento, 
                     use_container_width=True, 
                     hide_index=True,
                     column_config={
-                        col_evento: st.column_config.NumberColumn("Total", format="%d")
+                        "Usuario": st.column_config.TextColumn(
+                            "Usuario",
+                            width="medium", # Puedes usar "small", "medium", o "large"
+                        ),
+                        col_evento: st.column_config.NumberColumn(
+                            "Total",
+                            format="%d",
+                            width="small", # Esto estrecha la columna del número
+                        )
                     }
                 )
             
