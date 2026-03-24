@@ -169,17 +169,18 @@ def generar_resumen_llm(viaje, categoria):
 # --- INTERFAZ STREAMLIT ---
 # Título principal
 #st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
-#st.title("💧 Gotita")
+st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
 
-# Creamos dos columnas. El ratio [0.2, 1] hace que la primera sea pequeña para la imagen
-col_logo, col_titulo = st.columns([0.1, 1])
-
-with col_logo:
-    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
-
-with col_titulo:
-    # Añadimos un poco de espacio superior con HTML si quieres centrarlo perfectamente
-    st.markdown("<h1 style='margin-top: -20px;'>Gotita</h1>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <img src="https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000" width="50">
+        <h1 style="margin: 0; font-size: 2.5rem; white-space: nowrap;">Gotita</h1>
+    </div>
+    """,
+    unsafe_allow_index=True, # Usa True si estás en versiones antiguas o usa unsafe_allow_html=True
+    unsafe_allow_html=True
+)
 
 st.sidebar.title("💧 Menú principal")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
