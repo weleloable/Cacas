@@ -34,48 +34,36 @@ except Exception as e:
     st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
 
-# --- 3. AUTENTICACIÓN (BLOQUE REFORZADO) ---
+# --- 3. AUTENTICACIÓN  ---
+# --- 3. LOGIN NATIVO (SIN LIBRERÍAS EXTRA) ---
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-# Intentamos capturar la sesión de la librería
-session = login_form(
-    url=SUPABASE_URL,
-    apiKey=SUPABASE_KEY,
-    providers=["google"],
-)
+# Intentamos recuperar sesión si existe en la URL
+if not st.session_state.user:
+    curr_session = supabase.auth.get_session()
+    if curr_session and curr_session.user:
+        st.session_state.user = curr_session.user
 
-# LÓGICA DE REFUERZO: 
-# Si la librería no detecta la sesión pero acabamos de volver de Google...
-if not session:
-    try:
-        # Intentamos recuperar la sesión directamente del cliente de Supabase
-        # Esto ayuda si el token está en el almacenamiento local del navegador
-        res = supabase.auth.get_session()
-        if res and res.session:
-            session = {"user": res.session.user}
-    except:
-        pass
-
-# Si después de los intentos seguimos sin sesión, mostramos la bienvenida y PARAMOS
-if not session:
-    st.markdown("""
-        <div style="text-align: center; margin-top: 50px;">
-            <h1 style='font-size: 60px;'>💧</h1>
-            <h1>Bienvenido a Gotita</h1>
-            <p>Para entrar, pulsa en el botón de Google de arriba.</p>
-        </div>
-    """, unsafe_allow_html=True)
+# Si seguimos sin usuario, mostramos botón manual
+if not st.session_state.user:
+    st.title("Gotita 💧")
+    if st.button("Entrar con Google"):
+        # Esto genera la URL de Google directamente
+        res = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": "https://cacas.streamlit.app"
+            }
+        })
+        # Redirigimos manualmente
+        st.write(f"Redirigiendo... [Pulsa aquí si no carga]({res.url})")
+        st.stop()
     st.stop()
 
-# Si llegamos aquí, ES QUE HAY SESIÓN. 
-# Guardamos en session_state para que Streamlit no lo pierda al recargar
-if "user" not in st.session_state:
-    st.session_state.user = session['user']
-
+# Si hay usuario, extraemos datos
 USER_EMAIL = st.session_state.user.email
-# El nombre a veces viene en 'user_metadata' o en 'email' como fallback
-USER_NAME = st.session_state.user.user_metadata.get('full_name', USER_EMAIL.split('@')[0])
-
-
+USER_NAME = st.session_state.user.user_metadata.get('full_name', 'Usuario')
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
