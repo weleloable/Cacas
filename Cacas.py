@@ -7,7 +7,7 @@ import hashlib
 import pandas as pd
 import plotly.express as px
 
-st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
+
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
@@ -51,6 +51,8 @@ if session is None or 'user' not in session:
 # Datos del usuario logueado
 USER_EMAIL = session['user']['email']
 USER_NAME = session['user']['user_metadata'].get('full_name', 'Usuario')
+
+st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
