@@ -41,7 +41,7 @@ current_url = st.secrets.get("BASE_URL", "https://cacaculopedopis.streamlit.app/
 session = login_form(
     url=SUPABASE_URL,
     apiKey=SUPABASE_KEY,
-    providers=["google"],
+    providers=["google"]
 )
 
 # DEBUG: Si esto sigue saliendo vacío tras loguearte, 
