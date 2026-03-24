@@ -167,13 +167,15 @@ def generar_resumen_llm(viaje, categoria):
         return f"La IA se ha quedado sin palabras (Error): {e}"
 
 # --- INTERFAZ STREAMLIT ---
+# Título principal
+st.title("💧 Gotita" + st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100))
 
-st.sidebar.title("💩 Menú")
+st.sidebar.title("💧 Menú principal")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
 # Página: Inicio
 if page == "🏠 Inicio":
-    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
+    
     st.header("¡Bienvenido a Gotita!")
     st.info("Registra los hitos más... orgánicos de tus viajes con amigos.")
     
