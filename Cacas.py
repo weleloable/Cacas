@@ -7,7 +7,8 @@ import hashlib
 import pandas as pd
 import plotly.express as px
 
-
+# Esto te mostrará si hay algo en la URL que la app no está pillando
+st.write("Parámetros en la URL:", st.query_params)
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
