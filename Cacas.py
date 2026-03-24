@@ -278,69 +278,86 @@ elif page == "📊 Mi Viaje":
     else:
         st.warning("Nada por aquí.")
 
-# --- Dentro de la sección: elif page == "📈 Reportes": ---
+# --- "📈 Reportes": ---
 
 elif page == "📈 Reportes":
     st.header("📊 Estadísticas Finales")
     finalizados = cargar_viajes_finalizados()
     
     if finalizados:
-        v_f = st.selectbox("Selecciona un viaje para ver el desastre:", finalizados, format_func=lambda x: x['nombre'])
+        # Cargamos el viaje seleccionado y nos aseguramos de tener los datos más recientes
+        v_f_pre = st.selectbox("Selecciona un viaje para ver los resultados:", finalizados, format_func=lambda x: x['nombre'])
+        v_f = cargar_un_viaje(v_f_pre["id"]) 
         
-        # 1. Preparación de datos
+        # 1. Preparación de datos base
         res = []
         for u, d in v_f["usuarios"].items():
             row = {"Usuario": u}
             row.update(d["eventos"])
             res.append(row)
-        df = pd.DataFrame(res)
+        df_base = pd.DataFrame(res)
 
-        # 2. Tabla general
-        st.subheader("Cuadro de Honor (o de Vergüenza)")
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        st.divider()
+        st.subheader("🍰 Reparto del Pastel")
+        st.write("Clasificación por evento y su distribución:")
 
-        # 3. Gráficos de Tarta por Evento
-        st.subheader("Reparto del Pastel")
-        
-        # Identificamos qué columnas son eventos (todas menos 'Usuario')
-        eventos_columnas = [col for col in df.columns if col != "Usuario"]
-        
-        # Creamos filas de 2 columnas para que los gráficos no ocupen demasiado espacio vertical
-        cols_graficos = st.columns(2)
-        
-        import plotly.express as px # Asegúrate de tener plotly instalado
+        # 2. Iterar por cada evento disponible en el viaje
+        # Sacamos la lista de columnas que son eventos (todas menos 'Usuario')
+        eventos_columnas = [col for col in df_base.columns if col != "Usuario"]
 
-        for i, col_evento in enumerate(eventos_columnas):
-            # Usamos el índice para alternar entre la columna 1 y 2 de Streamlit
-            with cols_graficos[i % 2]:
-                # Buscamos el nombre amigable y el emoji en nuestro diccionario CATEGORIAS
-                # (Pequeña búsqueda para que el título quede bonito)
-                nombre_bonito = col_evento
-                for cat in CATEGORIAS.values():
-                    if col_evento in cat["eventos"]:
-                        info = cat["eventos"][col_evento]
-                        nombre_bonito = f"{info['emoji']} {info['nombre']}"
-                
-                # Crear el gráfico de tarta con Plotly
-                fig = px.pie(
-                    df, 
-                    values=col_evento, 
-                    names='Usuario', 
-                    title=f"Distribución de {nombre_bonito}",
-                    hole=0.3, # Lo convierte en un gráfico de "Donut", más moderno
-                    color_discrete_sequence=px.colors.qualitative.Pastel
+        import plotly.express as px
+
+        for col_evento in eventos_columnas:
+            # Buscamos el nombre amigable y emoji para el título
+            nombre_label = col_evento
+            for cat in CATEGORIAS.values():
+                if col_evento in cat["eventos"]:
+                    info = cat["eventos"][col_evento]
+                    nombre_label = f"{info['emoji']} {info['nombre']}"
+            
+            st.markdown(f"#### {nombre_label}")
+            
+            # Creamos la fila: Columna izquierda (Tabla) y Columna derecha (Gráfico)
+            # El ratio [1.5, 1] hace que la tabla sea un poco más ancha que el gráfico
+            c_tabla, c_grafico = st.columns([1.5, 1])
+            
+            # Datos específicos del evento ordenados
+            df_evento = df_base[["Usuario", col_evento]].sort_values(by=col_evento, ascending=False)
+            
+            with c_tabla:
+                # Mostramos la tabla limpia sin índice
+                st.dataframe(
+                    df_evento, 
+                    use_container_width=True, 
+                    hide_index=True,
+                    column_config={
+                        col_evento: st.column_config.NumberColumn("Total", format="%d")
+                    }
                 )
-                
-                # Ajustes estéticos
-                fig.update_traces(textposition='inside', textinfo='percent+label')
-                fig.update_layout(showlegend=False, margin=dict(t=30, b=10, l=10, r=10))
-                
-                st.plotly_chart(fig, use_container_width=True)
+            
+            with c_grafico:
+                # Si todos los valores son 0, Plotly puede dar error, controlamos eso:
+                if df_evento[col_evento].sum() > 0:
+                    fig = px.pie(
+                        df_evento, 
+                        values=col_evento, 
+                        names='Usuario',
+                        hole=0.4,
+                        color_discrete_sequence=px.colors.qualitative.Safe
+                    )
+                    # Ajustes para que el gráfico sea compacto y "pequeño"
+                    fig.update_layout(
+                        showlegend=False, 
+                        margin=dict(t=0, b=0, l=0, r=0),
+                        height=180 # Forzamos una altura pequeña
+                    )
+                    fig.update_traces(textinfo='percent') # Solo porcentaje para no saturar
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.write("No hay datos registrados 🚫")
+            
+            st.divider()
 
-        st.divider()
-
-        # 4. Generación de Narrativa IA (El código que ya teníamos)
+        # 3. Narrativa IA
         if st.button("🧠 Generar Narrativa con IA", type="primary"):
             with st.spinner("La IA está analizando vuestros pecados..."):
                 reportes = {}
@@ -349,11 +366,10 @@ elif page == "📈 Reportes":
                 actualizar_viaje(v_f["id"], {"reporte_llm": reportes})
                 st.rerun()
         
-        # Mostrar el reporte si existe
         if v_f.get("reporte_llm"):
             st.subheader("📝 Crónica del Viaje")
             for cat, texto in v_f["reporte_llm"].items():
-                with st.expander(f"Resumen de {cat}", expanded=True):
+                with st.expander(f"Crónica de {cat}", expanded=True):
                     st.write(texto)
     else:
-        st.info("No hay viajes finalizados todavía. ¡A seguir registrando!")
+        st.info("No hay viajes finalizados todavía.")

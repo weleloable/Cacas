@@ -3,3 +3,4 @@ pandas>=2.1.0
 protobuf<4.0
 supabase
 groq
+plotly
