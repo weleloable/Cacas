@@ -38,6 +38,8 @@ session = login_form(
     providers=["google"],
 )
 
+st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
+
 # Mejora en la detección: si no hay sesión o no hay usuario, PARAR
 if session is None or 'user' not in session:
     st.markdown("""
@@ -52,7 +54,7 @@ if session is None or 'user' not in session:
 USER_EMAIL = session['user']['email']
 USER_NAME = session['user']['user_metadata'].get('full_name', 'Usuario')
 
-st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app
+
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
