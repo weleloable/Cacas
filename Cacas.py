@@ -171,10 +171,27 @@ def generar_resumen_llm(viaje, categoria):
 st.sidebar.title("💩 Menú")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
+# Página: Inicio
 if page == "🏠 Inicio":
     st.header("¡Bienvenido a Gotita!")
     st.info("Registra los hitos más... orgánicos de tus viajes con amigos.")
-    st.image("https://img.icons8.com/emoji/96/000000/pile-of-poo.png", width=100)
+    st.image("https://icons8.com/icon/3GPNVKXRHLb1/drop", width=100)
+    
+    st.header("¡Bienvenido a Gotita!")
+    st.write("""
+    Esta aplicación te permite:
+    - 🏖️ Crear viajes con tus amigos
+    - 👥 Registrarte en un viaje activo
+    - 💧 Contar tus gotitas
+    - 📊 Ver estadísticas finales del viaje
+    
+    **¿Cómo funciona?**
+    1. Un admin crea un nuevo viaje
+    2. Otros usuarios se unen al viaje
+    3. Cada uno registra sus eventos (Cacas, Pises, ...)
+    4. Al final del viaje, se generan las estadísticas
+    """)
+
 
 elif page == "✈️ Crear Viaje":
     st.header("Crear Nuevo Viaje")
