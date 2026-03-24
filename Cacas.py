@@ -169,7 +169,7 @@ def generar_resumen_llm(viaje, categoria):
 # --- INTERFAZ STREAMLIT ---
 # Título principal
 #st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
-st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
+#st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
 
 st.markdown(
     """
