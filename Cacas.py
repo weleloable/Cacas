@@ -168,8 +168,18 @@ def generar_resumen_llm(viaje, categoria):
 
 # --- INTERFAZ STREAMLIT ---
 # Título principal
-st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
-st.title("💧 Gotita")
+#st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
+#st.title("💧 Gotita")
+
+# Creamos dos columnas. El ratio [0.2, 1] hace que la primera sea pequeña para la imagen
+col_logo, col_titulo = st.columns([0.2, 1])
+
+with col_logo:
+    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
+
+with col_titulo:
+    # Añadimos un poco de espacio superior con HTML si quieres centrarlo perfectamente
+    st.markdown("<h1 style='margin-top: -10px;'>Gotita</h1>", unsafe_allow_html=True)
 
 st.sidebar.title("💧 Menú principal")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
