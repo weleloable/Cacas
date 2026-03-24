@@ -173,15 +173,14 @@ page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Uni
 
 # Página: Inicio
 if page == "🏠 Inicio":
+    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
     st.header("¡Bienvenido a Gotita!")
     st.info("Registra los hitos más... orgánicos de tus viajes con amigos.")
-    st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
     
-    st.header("¡Bienvenido a Gotita!")
     st.write("""
     Esta aplicación te permite:
     - 🏖️ Crear viajes con tus amigos
-    - 👥 Registrarte en un viaje activo
+    - 👥 Unirte a un viaje activo
     - 💧 Contar tus gotitas
     - 📊 Ver estadísticas finales del viaje
     
@@ -279,37 +278,99 @@ elif page == "📊 Mi Viaje":
     else:
         st.warning("Nada por aquí.")
 
+# Página: Reportes
 elif page == "📈 Reportes":
-    st.header("Estadísticas Finales")
-    finalizados = cargar_viajes_finalizados()
-    if finalizados:
-        v_f = st.selectbox("Viaje finalizado:", finalizados, format_func=lambda x: x['nombre'])
-        
-        # Tabla de datos
-        res = []
-        for u, d in v_f["usuarios"].items():
-            row = {"Usuario": u}
-            row.update(d["eventos"])
-            res.append(row)
-        df = pd.DataFrame(res)
-        
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        # Gráfico rápido
-        st.bar_chart(df.set_index("Usuario"))
+    st.header("Reportes Finales")
 
-        if st.button("🧠 Generar Narrativa con IA", type="primary"):
-            with st.spinner("La IA está analizando vuestros registros..."):
-                reportes = {}
-                for cat in v_f["categorias"]:
-                    reportes[cat] = generar_resumen_llm(v_f, cat)
-                actualizar_viaje(v_f["id"], {"reporte_llm": reportes})
-                st.rerun()
-        
-        if v_f.get("reporte_llm"):
-            st.subheader("Crónica del Viaje")
-            for cat, texto in v_f["reporte_llm"].items():
-                with st.expander(f"Resumen de {cat}", expanded=True):
-                    st.write(texto)
+    datos = cargar_datos()
+    viajes_finalizados = [v for v in datos["viajes"] if not v["activo"]]
+
+    if viajes_finalizados:
+        viaje = st.selectbox(
+            "Selecciona un viaje finalizado:",
+            options=viajes_finalizados,
+            format_func=lambda x: f"{x['nombre']} (Finalizado: {x.get('fecha_finalizacion', 'N/A')})"
+        )
+
+        st.subheader(f"Reporte Final - {viaje['nombre']}")
+        st.write(f"**Admin:** {viaje['admin']}")
+        st.write(f"**Creado:** {viaje['fecha_creacion']}")
+        st.write(f"**Finalizado:** {viaje.get('fecha_finalizacion', 'N/A')}")
+
+        st.divider()
+
+        # Crear tabla de resultados
+        import pandas as pd
+
+        resultados = []
+        for usuario, data in viaje["usuarios"].items():
+            resultado_usuario = {"Usuario": usuario}
+            resultado_usuario.update(data["eventos"])
+            resultados.append(resultado_usuario)
+
+        # Mostrar tablas dinámicamente según las categorías
+        categorias = viaje.get("categorias", ["Cacas"])
+
+        # Crear columnas para mostrar las tablas lado a lado
+        cols_count = len(categorias)
+        cols = st.columns(cols_count)
+
+        for idx, categoria in enumerate(categorias):
+            if categoria in CATEGORIAS:
+                with cols[idx]:
+                    st.subheader(f"{CATEGORIAS[categoria]['emoji']} TOTAL {categoria.upper()}")
+
+                    # Crear tabla para esta categoría
+                    eventos_keys = list(CATEGORIAS[categoria]["eventos"].keys())
+
+                    # Si hay múltiples eventos en la categoría, mostrar una tabla por evento
+                    if len(eventos_keys) > 1:
+                        for evento_key in eventos_keys:
+                            df_evento = pd.DataFrame(resultados)[["Usuario", evento_key]].copy()
+                            df_evento = df_evento.sort_values(evento_key, ascending=False)
+                            df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
+
+                            evento_nombre = CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]
+                            evento_emoji = CATEGORIAS[categoria]["eventos"][evento_key]["emoji"]
+                            st.write(f"**{evento_emoji} {evento_nombre}**")
+                            st.dataframe(df_evento, use_container_width=False, hide_index=True)
+                            st.write("")
+                    else:
+                        # Si solo hay un evento, mostrar una sola tabla
+                        evento_key = eventos_keys[0]
+                        df_evento = pd.DataFrame(resultados)[["Usuario", evento_key]].copy()
+                        df_evento = df_evento.sort_values(evento_key, ascending=False)
+                        df_evento.columns = ["Usuario", CATEGORIAS[categoria]["eventos"][evento_key]["nombre"]]
+                        st.dataframe(df_evento, use_container_width=False, hide_index=True)
+
+        # Generar resumen IA por categoría
+        viaje_reporte_llm = viaje.get("reporte_llm", {}) if isinstance(viaje, dict) else {}
+        if st.button("🧠 Generar resumen de este viaje", type="primary"):
+            with st.spinner("Generando narrativa..."):
+                if not isinstance(viaje_reporte_llm, dict):
+                    viaje_reporte_llm = {}
+
+                for categoria in categorias:
+                    if categoria in CATEGORIAS:
+                        try:
+                            ranking = generar_ranking_categoria(viaje, categoria)
+                            texto_categoria = generar_resumen_llm(viaje, categoria, ranking)
+                            viaje_reporte_llm[categoria] = texto_categoria
+                        except Exception as e:
+                            viaje_reporte_llm[categoria] = f"Error generando resumen: {e}"
+
+                # Guardar texto generado en Supabase en campo json
+                try:
+                    supabase.table('viajes').update({'reporte_llm': viaje_reporte_llm}).eq('id', viaje['id']).execute()
+                    st.success("Se generó el reporte y se guardó en la base de datos.")
+                except Exception as e:
+                    st.error(f"Error guardando reporte en Supabase: {e}")
+
+        if viaje_reporte_llm:
+            st.subheader("📝 Narrativa del viaje")
+            for categoria, texto in viaje_reporte_llm.items():
+                st.markdown(f"**{categoria}**")
+                st.write(texto)
+
     else:
-        st.info("No hay reportes disponibles.")
+        st.info("No hay viajes finalizados aún")
