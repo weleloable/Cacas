@@ -178,7 +178,7 @@ st.markdown(
         <h1 style="margin: 0; font-size: 2.5rem; white-space: nowrap;">Gotita</h1>
     </div>
     """,
-    unsafe_allow_index=True, # Usa True si estás en versiones antiguas o usa unsafe_allow_html=True
+    #unsafe_allow_index=True, # Usa True si estás en versiones antiguas o usa unsafe_allow_html=True
     unsafe_allow_html=True
 )
 
