@@ -179,7 +179,7 @@ with col_logo:
 
 with col_titulo:
     # Añadimos un poco de espacio superior con HTML si quieres centrarlo perfectamente
-    st.markdown("<h1 style='margin-right: 0px;'>Gotita</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin-left: 50px;'>Gotita</h1>", unsafe_allow_html=True)
 
 st.sidebar.title("💧 Menú principal")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
