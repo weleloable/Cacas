@@ -2,44 +2,55 @@ import os
 import streamlit as st
 from datetime import datetime
 from supabase import create_client, Client
+from streamlit_supabase_auth import login_form, logout_button
 import hashlib
 import pandas as pd
+import plotly.express as px
 
-# --- CONFIGURACIÓN DE LA APP ---
-st.set_page_config(
-    page_title="Gotita",
-    page_icon="💧",
-    layout="wide"
-)
+# --- 1. CONFIGURACIÓN DE LA APP ---
+st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
 
-# Estilo CSS personalizado para botones grandes y diseño limpio
+# Estilo CSS para botones y tablas compactas
 st.markdown("""
     <style>
-    div.stButton > button {
-        height: 3.5em;
-        width: 100%;
-        border-radius: 10px;
-        font-size: 18px;
-        font-weight: bold;
-    }
-    .stMetric {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
-    }
+    div.stButton > button { height: 3.5em; width: 100%; border-radius: 10px; font-weight: bold; }
+    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .stDataFrame td, .stDataFrame th { padding: 2px 5px !important; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONFIGURACIÓN DE SUPABASE ---
+# --- 2. CONEXIÓN SUPABASE ---
 try:
     SUPABASE_URL = st.secrets["supabase"]["url"]
     SUPABASE_KEY = st.secrets["supabase"]["key"]
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
-    st.error(f"Error de configuración (Secrets/Conexión): {e}")
+    st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
 
-# --- CONSTANTES ---
+# --- 3. AUTENTICACIÓN CON GOOGLE ---
+# Esto bloquea la app hasta que el usuario se loguee
+session = login_form(
+    url=SUPABASE_URL,
+    apiKey=SUPABASE_KEY,
+    providers=["google"],
+)
+
+# Mejora en la detección: si no hay sesión o no hay usuario, PARAR
+if session is None or 'user' not in session:
+    st.markdown("""
+        <div style="text-align: center; margin-top: 50px;">
+            <h1>💧 Bienvenido a Gotita</h1>
+            <p>Inicia sesión con Google para continuar.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    st.stop()
+
+# Datos del usuario logueado
+USER_EMAIL = session['user']['email']
+USER_NAME = session['user']['user_metadata'].get('full_name', 'Usuario')
+
+# --- 4. CONSTANTES ---
 CATEGORIAS = {
     "Gotitas": {
         "emoji": "💧",
@@ -59,10 +70,9 @@ CATEGORIAS = {
     }
 }
 
-# --- FUNCIONES DE BASE DE DATOS (OPTIMIZADAS) ---
+# --- 5. FUNCIONES DE BASE DE DATOS ---
 
 def cargar_un_viaje(viaje_id):
-    """Carga solo un viaje específico para evitar tráfico innecesario."""
     res = supabase.table('viajes').select('*').eq('id', viaje_id).execute()
     return res.data[0] if res.data else None
 
@@ -75,225 +85,153 @@ def cargar_viajes_finalizados():
     return res.data
 
 def actualizar_viaje(viaje_id, campos):
-    """Actualiza campos específicos de un viaje por ID."""
-    try:
-        supabase.table('viajes').update(campos).eq('id', viaje_id).execute()
-        return True
-    except Exception as e:
-        st.error(f"Error al actualizar: {e}")
-        return False
+    supabase.table('viajes').update(campos).eq('id', viaje_id).execute()
 
-# --- LÓGICA DE NEGOCIO ---
+# --- 6. LÓGICA DE NEGOCIO (SIN CONTRASEÑAS) ---
 
-def crear_viaje(nombre_viaje, admin_user, categorias_sel):
+def crear_viaje(nombre_viaje, categorias_sel):
     nuevo_viaje = {
         "nombre": nombre_viaje,
-        "admin": admin_user,
+        "admin": USER_EMAIL, # El admin es el email de Google
         "fecha_creacion": datetime.now().isoformat(),
         "activo": True,
         "categorias": categorias_sel,
-        "usuarios": {},
+        "usuarios": {
+            USER_EMAIL: {
+                "nombre": USER_NAME,
+                "eventos": {ev: 0 for cat in categorias_sel for ev in CATEGORIAS[cat]["eventos"]}
+            }
+        },
         "reporte_llm": {}
     }
     res = supabase.table('viajes').insert(nuevo_viaje).execute()
     return res.data[0]
 
-def añadir_usuario_a_viaje(viaje, nombre_usuario, password):
-    if nombre_usuario in viaje["usuarios"]:
-        return False
+def añadir_usuario_a_viaje(viaje):
+    if USER_EMAIL in viaje["usuarios"]:
+        return True # Ya está dentro
     
-    hashed_pw = hashlib.sha256(password.encode()).hexdigest()
     eventos_init = {}
     for cat in viaje.get("categorias", []):
-        if cat in CATEGORIAS:
-            for ev_key in CATEGORIAS[cat]["eventos"]:
-                eventos_init[ev_key] = 0
+        for ev_key in CATEGORIAS[cat]["eventos"]:
+            eventos_init[ev_key] = 0
     
-    nuevos_usuarios = viaje["usuarios"]
-    nuevos_usuarios[nombre_usuario] = {
-        "password": hashed_pw,
+    viaje["usuarios"][USER_EMAIL] = {
+        "nombre": USER_NAME,
         "eventos": eventos_init
     }
-    return actualizar_viaje(viaje["id"], {"usuarios": nuevos_usuarios})
+    actualizar_viaje(viaje["id"], {"usuarios": viaje["usuarios"]})
+    return True
 
-def modificar_evento(viaje_id, usuario, tipo_evento, incremento=True):
+def modificar_evento(viaje_id, tipo_evento, incremento=True):
     viaje = cargar_un_viaje(viaje_id)
-    if not viaje or usuario not in viaje["usuarios"]:
-        return False
-    
-    actual = viaje["usuarios"][usuario]["eventos"].get(tipo_evento, 0)
+    actual = viaje["usuarios"][USER_EMAIL]["eventos"].get(tipo_evento, 0)
     nuevo_valor = actual + 1 if incremento else max(0, actual - 1)
     
-    viaje["usuarios"][usuario]["eventos"][tipo_evento] = nuevo_valor
-    return actualizar_viaje(viaje_id, {"usuarios": viaje["usuarios"]})
+    viaje["usuarios"][USER_EMAIL]["eventos"][tipo_evento] = nuevo_valor
+    actualizar_viaje(viaje_id, {"usuarios": viaje["usuarios"]})
 
-# --- INTEGRACIÓN IA (GROQ) ---
+# --- 7. IA CON LLAMA 3.3 ---
 
 def generar_resumen_llm(viaje, categoria):
     from groq import Groq
-    
-    # Preparamos el ranking
-    event_keys = list(CATEGORIAS[categoria]["eventos"].keys())
-    ranking = []
-    for user, info in viaje["usuarios"].items():
-        total = sum(info["eventos"].get(k, 0) for k in event_keys)
-        ranking.append(f"- {user}: Total {total}")
-    
-    ranking_str = "\n".join(ranking)
-    
+    detalles = ""
+    for ev_k, ev_v in CATEGORIAS[categoria]["eventos"].items():
+        detalles += f"\n{ev_v['nombre']}: "
+        for u_email, info in viaje["usuarios"].items():
+            detalles += f"{info['nombre']} ({info['eventos'].get(ev_k, 0)}), "
+
+    eventos = CATEGORIAS[categoria]["eventos"]
     # Prompt optimizado (Humor ácido pero sin "insultos graves" para evitar baneos)
     prompt = (
         f"Eres un cronista sarcástico y divertido. Escribe un párrafo breve (200 palabras) "
-        f"sobre cada Evento '{CATEGORIAS[categoria]["eventos"]}' la categoría '{categoria}' en el viaje '{viaje['nombre']}'. "
+        f"sobre cada Evento '{eventos}' la categoría '{categoria}' en el viaje '{viaje['nombre']}'. "
         f"Usa un tono de 'roast' (humor ácido y picante). "
         f"Menciona quién es el líder indiscutible y quién ha dado vergüenza ajena por su bajo rendimiento. "
-        f"No uses nombres reales si no quieres, usa los datos: \n{ranking_str}\n "
-        f"Termina con una frase legendaria."
-    )
-
+        f"Termina con una frase legendaria.")
+    
     try:
-        api_key = st.secrets["groq"]["key"]
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Eres un narrador de comedias tipo 'Roast' en español."},
-                {"role": "user", "content": prompt}
-            ],
-            # CAMBIA ESTA LÍNEA:
-            model="llama-3.3-70b-versatile", 
+        client = Groq(api_key=st.secrets["groq"]["key"])
+        res = client.chat.completions.create(
+            messages=[{"role": "system", "content": "Narrador de comedia en español."},
+                      {"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
             temperature=0.8
         )
-        return response.choices[0].message.content.strip()
+        return res.choices[0].message.content
     except Exception as e:
-        return f"La IA se ha quedado sin palabras (Error): {e}"
+        return f"Error en IA: {e}"
 
-# --- INTERFAZ STREAMLIT ---
-# Título principal
-#st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100)
-#st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=80)
+# --- 8. INTERFAZ ---
 
-st.markdown(
-    """
+# Header con Logo y Título en la misma línea (Móvil OK)
+st.markdown(f"""
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
         <img src="https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000" width="50">
-        <h1 style="margin: 0; font-size: 2.5rem; white-space: nowrap;">Gotita</h1>
+        <h1 style="margin: 0; font-size: 2rem; white-space: nowrap;">Gotita</h1>
     </div>
-    """,
-    #unsafe_allow_index=True, # Usa True si estás en versiones antiguas o usa unsafe_allow_html=True
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
 
-st.sidebar.title("💧 Menú principal")
-page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
+# Sidebar
+with st.sidebar:
+    st.write(f"👤 **{USER_NAME}**")
+    if logout_button(): st.rerun()
+    st.divider()
+    page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
-# Página: Inicio
 if page == "🏠 Inicio":
-    
-    st.header("¡Bienvenido a Gotita!")
-    st.info("Registra los hitos más... orgánicos de tus viajes con amigos.")
-    
-    st.write("""
-    Esta aplicación te permite:
-    - 🏖️ Crear viajes con tus amigos
-    - 👥 Unirte a un viaje activo
-    - 💧 Contar tus gotitas
-    - 📊 Ver estadísticas finales del viaje
-    
-    **¿Cómo funciona?**
-    1. Un admin crea un nuevo viaje
-    2. Otros usuarios se unen al viaje
-    3. Cada uno registra sus eventos (Cacas, Pises, ...)
-    4. Al final del viaje, se generan las estadísticas
-    """)
-
+    st.header(f"¡Hola, {USER_NAME.split()[0]}!")
+    st.write("Gestiona tus viajes compartidos y mantén el conteo de eventos con tus amigos de forma automática.")
 
 elif page == "✈️ Crear Viaje":
-    st.header("Crear Nuevo Viaje")
-    nombre_v = st.text_input("Nombre del viaje")
-    admin_v = st.text_input("Tu nombre (Admin)")
+    st.header("Nuevo Viaje")
+    nombre_v = st.text_input("Nombre del destino")
+    seleccionadas = [cat for cat in CATEGORIAS if st.checkbox(f"{CATEGORIAS[cat]['emoji']} {cat}", value=True)]
     
-    st.write("Categorías:")
-    c_cols = st.columns(len(CATEGORIAS))
-    seleccionadas = []
-    for i, (cat_n, cat_i) in enumerate(CATEGORIAS.items()):
-        if c_cols[i].checkbox(f"{cat_i['emoji']} {cat_n}", value=True):
-            seleccionadas.append(cat_n)
-            
-    if st.button("Crear Viaje", type="primary"):
-        if nombre_v and admin_v and seleccionadas:
-            v = crear_viaje(nombre_v, admin_v, seleccionadas)
-            st.success(f"¡Viaje '{v['nombre']}' creado! ID: {v['id']}")
-        else:
-            st.warning("Faltan datos.")
+    if st.button("Crear", type="primary"):
+        if nombre_v and seleccionadas:
+            v = crear_viaje(nombre_v, seleccionadas)
+            st.success(f"¡Viaje creado! ID: {v['id']}")
+        else: st.warning("Rellena todos los campos.")
 
 elif page == "📋 Unirme":
-    st.header("Únete a la aventura")
+    st.header("Unirse a un Viaje")
     activos = cargar_viajes_activos()
     if activos:
-        viaje_sel = st.selectbox("Viaje:", activos, format_func=lambda x: f"{x['nombre']} (ID: {x['id']})")
-        u_name = st.text_input("Tu nombre")
-        u_pass = st.text_input("Contraseña", type="password")
-        if st.button("Unirme"):
-            if añadir_usuario_a_viaje(viaje_sel, u_name, u_pass):
-                st.success("¡Bienvenido al equipo!")
-                st.balloons()
-            else:
-                st.error("Nombre ya en uso o error de conexión.")
-    else:
-        st.warning("No hay viajes activos.")
+        viaje_sel = st.selectbox("Selecciona:", activos, format_func=lambda x: f"{x['nombre']} (ID: {x['id']})")
+        if st.button("Unirme ahora"):
+            añadir_usuario_a_viaje(viaje_sel)
+            st.success("¡Te has unido correctamente!")
+            st.balloons()
+    else: st.info("No hay viajes activos.")
 
 elif page == "📊 Mi Viaje":
     activos = cargar_viajes_activos()
-    if activos:
-        v_obj = st.selectbox("Selecciona viaje:", activos, format_func=lambda x: x['nombre'])
-        viaje = cargar_un_viaje(v_obj["id"]) # Recarga fresca
+    viajes_donde_estoy = [v for v in activos if USER_EMAIL in v["usuarios"]]
+    
+    if viajes_donde_estoy:
+        v_obj = st.selectbox("Viaje actual:", viajes_donde_estoy, format_func=lambda x: x['nombre'])
+        viaje = cargar_un_viaje(v_obj["id"])
         
-        user_list = list(viaje["usuarios"].keys())
-        if user_list:
-            usuario = st.selectbox("¿Quién eres?", user_list)
-            
-            # Login simple con session_state
-            login_key = f"auth_{viaje['id']}_{usuario}"
-            if login_key not in st.session_state:
-                st.session_state[login_key] = False
-            
-            if not st.session_state[login_key]:
-                pw_input = st.text_input("Contraseña:", type="password")
-                if st.button("Entrar"):
-                    if hashlib.sha256(pw_input.encode()).hexdigest() == viaje["usuarios"][usuario]["password"]:
-                        st.session_state[login_key] = True
-                        st.rerun()
-                    else:
-                        st.error("Incorrecta.")
-            else:
-                st.subheader(f"Panel de {usuario}")
-                for cat in viaje["categorias"]:
-                    st.divider()
-                    st.write(f"### {CATEGORIAS[cat]['emoji']} {cat}")
-                    evs = CATEGORIAS[cat]["eventos"]
-                    cols = st.columns(len(evs))
-                    for i, (ev_k, ev_v) in enumerate(evs.items()):
-                        with cols[i]:
-                            cant = viaje["usuarios"][usuario]["eventos"].get(ev_k, 0)
-                            st.metric(ev_v["nombre"], cant)
-                            c1, c2 = st.columns(2)
-                            if c1.button(f"➕ {ev_v['emoji']}", key=f"add_{ev_k}"):
-                                modificar_evento(viaje["id"], usuario, ev_k, True)
-                                st.rerun()
-                            if c2.button(f"➖", key=f"sub_{ev_k}"):
-                                modificar_evento(viaje["id"], usuario, ev_k, False)
-                                st.rerun()
-                
-                if usuario == viaje["admin"]:
-                    if st.button("🏁 FINALIZAR VIAJE", type="secondary"):
-                        actualizar_viaje(viaje["id"], {"activo": False, "fecha_finalizacion": datetime.now().isoformat()})
-                        st.rerun()
-        else:
-            st.info("Aún no hay usuarios.")
-    else:
-        st.warning("Nada por aquí.")
-
-# --- "📈 Reportes": ---
+        for cat in viaje["categorias"]:
+            st.divider()
+            st.subheader(f"{CATEGORIAS[cat]['emoji']} {cat}")
+            evs = CATEGORIAS[cat]["eventos"]
+            cols = st.columns(len(evs))
+            for i, (ev_k, ev_v) in enumerate(evs.items()):
+                with cols[i]:
+                    valor = viaje["usuarios"][USER_EMAIL]["eventos"].get(ev_k, 0)
+                    st.metric(ev_v["nombre"], valor)
+                    c1, c2 = st.columns(2)
+                    if c1.button(f"➕", key=f"add_{ev_k}"):
+                        modificar_evento(viaje["id"], ev_k, True); st.rerun()
+                    if c2.button(f"➖", key=f"sub_{ev_k}"):
+                        modificar_evento(viaje["id"], ev_k, False); st.rerun()
+        
+        if USER_EMAIL == viaje["admin"]:
+            if st.button("🏁 FINALIZAR VIAJE"):
+                actualizar_viaje(viaje["id"], {"activo": False}); st.rerun()
+    else: st.warning("No estás en ningún viaje activo.")
 
 elif page == "📈 Reportes":
     st.header("📊 Estadísticas Finales")
@@ -396,3 +334,7 @@ elif page == "📈 Reportes":
                     st.write(texto)
     else:
         st.info("No hay viajes finalizados todavía.")
+
+
+
+st.write("Datos de sesión actual:", session) # Esto te dirá qué está detectando la app

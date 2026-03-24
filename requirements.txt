@@ -4,3 +4,4 @@ protobuf<4.0
 supabase
 groq
 plotly
+streamlit-supabase-auth
