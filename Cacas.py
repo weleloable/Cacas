@@ -381,7 +381,7 @@ elif page == "📈 Reportes":
             st.divider()
 
         # 3. Narrativa IA
-        if st.button("🧠 Generar Narrativa con IA", type="primary"):
+        if st.button("🧠 Generar Narrativa", type="primary"):
             with st.spinner("La IA está analizando vuestros pecados..."):
                 reportes = {}
                 for cat in v_f["categorias"]:
