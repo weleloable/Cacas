@@ -346,12 +346,12 @@ elif page == "📈 Reportes":
                     column_config={
                         "Usuario": st.column_config.TextColumn(
                             "Usuario",
-                            width="small", # Puedes usar "small", "medium", o "large"
+                            width=100, # Puedes usar "small", "medium", o "large"
                         ),
                         col_evento: st.column_config.NumberColumn(
                             "Total",
                             format="%d",
-                            width="small", # Esto estrecha la columna del número
+                            width=50, # Esto estrecha la columna del número
                         )
                     }
                 )
