@@ -168,7 +168,7 @@ def generar_resumen_llm(viaje, categoria):
 
 # --- INTERFAZ STREAMLIT ---
 # Título principal
-st.title("💧 Gotita" + st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100))
+st.title("💧 Gotita" & st.image("https://img.icons8.com/?size=100&id=3GPNVKXRHLb1&format=png&color=000000", width=100))
 
 st.sidebar.title("💧 Menú principal")
 page = st.sidebar.radio("Ir a:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
