@@ -93,6 +93,7 @@ if st.session_state.user is None:
                     if res.user:
                         # Calculamos el identificador que usas en la base de datos
                         id_para_cookie = res.user.user_metadata.get('full_name', res.user.email)
+                        st.write(res)
                         # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
                         cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
                         st.session_state.user = res.user
