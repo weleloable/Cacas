@@ -5,3 +5,4 @@ supabase
 groq
 plotly
 streamlit-supabase-auth
+extra-streamlit-components
