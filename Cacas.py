@@ -97,6 +97,7 @@ if st.session_state.user is None:
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
 curr_user = st.session_state.user
+st.write(curr_user, st.session_state.user, res)
 USER_ID = curr_user.id
 USER_NAME = curr_user.user_metadata.get('full_name', curr_user.email)
 
