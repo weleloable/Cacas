@@ -5,7 +5,8 @@ import pandas as pd
 import plotly.express as px
 # Obtener la URL actual de la app dinámicamente
 import urllib.parse
-
+import random
+import string
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
@@ -112,6 +113,11 @@ CATEGORIAS = {
 }
 
 # --- 5. FUNCIONES DE BASE DE DATOS ---
+def generar_codigo_viaje():
+    # Genera un código tipo ABC-123
+    letras = ''.join(random.choices(string.ascii_uppercase, k=3))
+    numeros = ''.join(random.choices(string.digits, k=3))
+    return f"{letras}-{numeros}"
 
 def cargar_un_viaje(viaje_id):
     res = supabase.table('viajes').select('*').eq('id', viaje_id).execute()
@@ -143,6 +149,7 @@ def crear_viaje(nombre_viaje, categorias_sel):
                 "eventos": {ev: 0 for cat in categorias_sel for ev in CATEGORIAS[cat]["eventos"]}
             }
         },
+        "codigo": codigo_nuevo, # Guardamos el código
         "reporte_llm": {}
     }
     res = supabase.table('viajes').insert(nuevo_viaje).execute()
@@ -299,20 +306,35 @@ elif page == "✈️ Crear Viaje":
     
     if st.button("Crear", type="primary"):
         if nombre_v and seleccionadas:
-            v = crear_viaje(nombre_v, seleccionadas)
+            codigo_nuevo = generar_codigo_viaje() # Generamos el código único
+            v = crear_viaje(nombre_v, seleccionadas, codigo_nuevo)
             st.success(f"¡Viaje creado! ID: {v['id']}")
+            st.code(f"Código para compartir: {codigo_nuevo}", language="text")
+            st.info("Copia este código y pásaselo a tus amigos para que se unan.")
         else: st.warning("Rellena todos los campos.")
 
 elif page == "📋 Unirme":
     st.header("Unirse a un Viaje")
-    activos = cargar_viajes_activos()
-    if activos:
-        viaje_sel = st.selectbox("Selecciona:", activos, format_func=lambda x: f"{x['nombre']} (ID: {x['id']})")
-        if st.button("Unirme ahora"):
-            añadir_usuario_a_viaje(viaje_sel)
-            st.success("¡Te has unido correctamente!")
-            st.balloons()
-    else: st.info("No hay viajes activos.")
+    st.write("Introduce el código que te ha pasado el administrador del viaje.")
+    codigo_input = st.text_input("Código del Viaje (ej: ABC-123)").upper().strip()
+
+    if st.button("Buscar y Unirme"):
+        if codigo_input:
+            # Buscamos en Supabase el viaje que tenga ese código y esté activo
+            res = supabase.table('viajes').select('*').eq('codigo', codigo_input).eq('activo', True).execute()
+            
+            if res.data:
+                viaje_encontrado = res.data[0]
+                
+                # Intentamos añadir al usuario
+                exito = añadir_usuario_a_viaje(viaje_encontrado)
+                if exito:
+                    st.success(f"¡Te has unido a **{viaje_encontrado['nombre']}**!")
+                    st.balloons()
+            else:
+                st.error("Código no encontrado o el viaje ya ha finalizado. Revisa que esté bien escrito.")
+        else:
+            st.warning("Escribe un código primero.")
 
 elif page == "📊 Mi Viaje":
     activos = cargar_viajes_activos()
@@ -358,6 +380,7 @@ elif page == "📊 Mi Viaje":
         # Admin controls - Solo el usuario admin puede finalizar
         if USER_NAME == viaje["admin"]:
             st.subheader("⚙️ Controles de Admin")
+            st.sidebar.info(f"🔑 Código del viaje: **{viaje['codigo']}**")
             st.info(f"Eres el admin de este viaje. Solo tú puedes finalizarlo.")
             if st.button("🏁 Finalizar Viaje", type="secondary"):
                 finalizar_viaje(viaje["id"])
