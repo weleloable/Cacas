@@ -86,8 +86,10 @@ if st.session_state.user is None:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email_input, "password": pw_input})
                     if res.user:
-                        # ✅ GUARDAMOS LA COOKIE (Dura 30 días)
-                        cookie_manager.set("gotita_user_id", res.user.id, expires_at=None)
+                        # Calculamos el identificador que usas en la base de datos
+                        id_para_cookie = res.user.user_metadata.get('full_name', res.user.email)
+                        # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
+                        cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
@@ -505,6 +507,3 @@ elif page == "📈 Reportes":
                     st.write(texto)
     else:
         st.info("No hay viajes finalizados todavía.")
-
-
-
