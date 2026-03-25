@@ -7,6 +7,7 @@ import plotly.express as px
 import urllib.parse
 import random
 import string
+import time
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
@@ -72,6 +73,7 @@ if st.session_state.user is None:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": pw})
                     st.session_state.user = res.user
+                    time.sleep(0.5)
                     st.rerun()
                 except: st.error("Datos incorrectos.")
 
