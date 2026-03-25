@@ -210,6 +210,20 @@ with st.sidebar:
 if page == "🏠 Inicio":
     st.header(f"¡Hola, {USER_NAME.split()[0]}!")
     st.write("Gestiona tus viajes compartidos y mantén el conteo de eventos con tus amigos de forma automática.")
+    st.header("¡Bienvenido a Gotita!")
+    st.write("""
+    Esta aplicación te permite:
+    - 🏖️ Crear viajes con tus amigos
+    - 👥 Registrarte en un viaje activo
+    - 💧 Contar tus gotitas
+    - 📊 Ver estadísticas finales del viaje
+    
+    **¿Cómo funciona?**
+    1. Un admin crea un nuevo viaje
+    2. Otros usuarios se unen al viaje
+    3. Cada uno registra sus eventos (Cacas, Pises, ...)
+    4. Al final del viaje, se generan las estadísticas
+    """)
 
 elif page == "✈️ Crear Viaje":
     st.header("Nuevo Viaje")
