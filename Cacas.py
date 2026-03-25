@@ -66,7 +66,7 @@ with st.sidebar:
     if st.session_state.user is not None:
         # Verificamos si el usuario es un objeto de Supabase o un string de la cookie
         if isinstance(st.session_state.user, str):
-            st.write(f"✅ Sesión recordada: {st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)}")
+            st.write(f"✅ Sesión recordada: {st.session_state.user.email}")
         else:
             nombre_display = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
             st.write(f"✅ Sesión activa: {nombre_display}")
