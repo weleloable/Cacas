@@ -133,12 +133,12 @@ def actualizar_viaje(viaje_id, campos):
 def crear_viaje(nombre_viaje, categorias_sel):
     nuevo_viaje = {
         "nombre": nombre_viaje,
-        "admin": USER_ID, # El admin es el email de Google
+        "admin": USER_NAME, # El admin es el email de Google
         "fecha_creacion": datetime.now().isoformat(),
         "activo": True,
         "categorias": categorias_sel,
         "usuarios": {
-            USER_ID: {
+            USER_NAME: {
                 "nombre": USER_NAME,
                 "eventos": {ev: 0 for cat in categorias_sel for ev in CATEGORIAS[cat]["eventos"]}
             }
@@ -184,10 +184,10 @@ def añadir_usuario_a_viaje(viaje):
 
 def modificar_evento(viaje_id, tipo_evento, incremento=True):
     viaje = cargar_un_viaje(viaje_id)
-    actual = viaje["usuarios"][USER_ID]["eventos"].get(tipo_evento, 0)
+    actual = viaje["usuarios"][USER_NAME]["eventos"].get(tipo_evento, 0)
     nuevo_valor = actual + 1 if incremento else max(0, actual - 1)
     
-    viaje["usuarios"][USER_ID]["eventos"][tipo_evento] = nuevo_valor
+    viaje["usuarios"][USER_NAME]["eventos"][tipo_evento] = nuevo_valor
     actualizar_viaje(viaje_id, {"usuarios": viaje["usuarios"]})
 
 def registrar_evento(viaje_id, usuario, tipo_evento):
@@ -338,19 +338,19 @@ elif page == "📊 Mi Viaje":
 
                 for idx, (evento_key, evento_info) in enumerate(eventos.items()):
                     with cols[idx]:
-                        contador = viaje["usuarios"][USER_ID]["eventos"].get(evento_key, 0)
+                        contador = viaje["usuarios"][USER_NAME]["eventos"].get(evento_key, 0)
                         st.write(f"**{evento_info['emoji']} {evento_info['nombre']}**")
                         row_cols = st.columns([1, 1, 1])
                         with row_cols[0]:
                             st.metric("Cantidad", contador)
                         with row_cols[1]:
                             if st.button(f"{evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
-                                registrar_evento(viaje["id"], USER_ID, evento_key)
+                                registrar_evento(viaje["id"], USER_NAME, evento_key)
                                 st.rerun()
                         with row_cols[2]:
                             if contador > 0:
                                 if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=False, key=f"btn_del_{evento_key}"):
-                                    eliminar_evento(viaje["id"], USER_ID, evento_key)
+                                    eliminar_evento(viaje["id"], USER_NAME, evento_key)
                                     st.rerun()
 
         st.divider()
