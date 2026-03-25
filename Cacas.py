@@ -63,7 +63,7 @@ if saved_user_id and st.session_state.user is None:
 
 # --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
 with st.sidebar:
-    if st.session_state.user:
+    if st.session_state.user is not None:
         st.write(f"✅ Sesión activa: {st.session_state.user.email}")
     else:
         st.write("🔒 No hay sesión iniciada")
@@ -93,7 +93,6 @@ if st.session_state.user is None:
                         st.rerun()
                 except Exception as e:
                     st.error("Datos incorrectos")
-                    st.write("Estamos aqui dentro???", e)
     st.stop()
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
