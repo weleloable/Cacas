@@ -10,12 +10,28 @@ import urllib.parse
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
 
-# Estilo CSS para botones y tablas compactas
+# Estilo CSS mejorado (Sin fondo fijo en Metric para evitar errores en modo oscuro)
 st.markdown("""
     <style>
-    div.stButton > button { height: 3.5em; width: 100%; border-radius: 10px; font-weight: bold; }
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
-    .stDataFrame td, .stDataFrame th { padding: 2px 5px !important; font-size: 14px; }
+    /* Estilo para botones */
+    div.stButton > button { 
+        height: 3.5em; 
+        width: 100%; 
+        border-radius: 10px; 
+        font-weight: bold; 
+    }
+    
+    /* Estilo para las métricas (ajustado para modo oscuro/claro) */
+    [data-testid="stMetric"] {
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid rgba(128, 128, 128, 0.2); /* Un borde sutil en lugar de fondo fijo */
+    }
+
+    /* Opcional: Si quieres que el texto de la métrica sea siempre legible */
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
