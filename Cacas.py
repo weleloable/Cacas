@@ -132,6 +132,24 @@ def crear_viaje(nombre_viaje, categorias_sel):
     res = supabase.table('viajes').insert(nuevo_viaje).execute()
     return res.data[0]
 
+def cargar_datos():
+    """Carga los datos desde Supabase"""
+    try:
+        response = supabase.table('viajes').select('*').execute()
+        return {"viajes": response.data}
+    except Exception as e:
+        st.error(f"Error cargando datos: {e}")
+        return {"viajes": []}
+
+def guardar_datos(datos):
+    """Guarda los datos en Supabase"""
+    try:
+        # Upsert cada viaje
+        for viaje in datos["viajes"]:
+            supabase.table('viajes').upsert(viaje).execute()
+    except Exception as e:
+        st.error(f"Error guardando datos: {e}")
+
 def añadir_usuario_a_viaje(viaje):
     if USER_ID in viaje["usuarios"]:
         return True # Ya está dentro
@@ -155,6 +173,41 @@ def modificar_evento(viaje_id, tipo_evento, incremento=True):
     
     viaje["usuarios"][USER_ID]["eventos"][tipo_evento] = nuevo_valor
     actualizar_viaje(viaje_id, {"usuarios": viaje["usuarios"]})
+
+def registrar_evento(viaje_id, usuario, tipo_evento):
+    """Registra un evento (caca o pis) para un usuario en un viaje"""
+    datos = cargar_datos()
+    for viaje in datos["viajes"]:
+        if viaje["id"] == viaje_id:
+            if usuario in viaje["usuarios"]:
+                viaje["usuarios"][usuario]["eventos"][tipo_evento] += 1
+                guardar_datos(datos)
+                return True
+    return False
+
+def eliminar_evento(viaje_id, usuario, tipo_evento):
+    """Elimina un evento (caca o pis) para un usuario en un viaje"""
+    datos = cargar_datos()
+    for viaje in datos["viajes"]:
+        if viaje["id"] == viaje_id:
+            if usuario in viaje["usuarios"]:
+                # No permite que baje de 0
+                if viaje["usuarios"][usuario]["eventos"][tipo_evento] > 0:
+                    viaje["usuarios"][usuario]["eventos"][tipo_evento] -= 1
+                    guardar_datos(datos)
+                    return True
+    return False
+
+def finalizar_viaje(viaje_id):
+    """Finaliza un viaje y genera el reporte final"""
+    datos = cargar_datos()
+    for viaje in datos["viajes"]:
+        if viaje["id"] == viaje_id:
+            viaje["activo"] = False
+            viaje["fecha_finalizacion"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            guardar_datos(datos)
+            return viaje
+    return None
 
 # --- 7. IA CON LLAMA 3.3 ---
 
@@ -253,24 +306,47 @@ elif page == "📊 Mi Viaje":
         v_obj = st.selectbox("Viaje actual:", viajes_donde_estoy, format_func=lambda x: x['nombre'])
         viaje = cargar_un_viaje(v_obj["id"])
         
-        for cat in viaje["categorias"]:
-            st.divider()
-            st.subheader(f"{CATEGORIAS[cat]['emoji']} {cat}")
-            evs = CATEGORIAS[cat]["eventos"]
-            cols = st.columns(len(evs))
-            for i, (ev_k, ev_v) in enumerate(evs.items()):
-                with cols[i]:
-                    valor = viaje["usuarios"][USER_ID]["eventos"].get(ev_k, 0)
-                    st.metric(ev_v["nombre"], valor)
-                    c1, c2 = st.columns(2)
-                    if c1.button(f"➕", key=f"add_{ev_k}"):
-                        modificar_evento(viaje["id"], ev_k, True); st.rerun()
-                    if c2.button(f"➖", key=f"sub_{ev_k}"):
-                        modificar_evento(viaje["id"], ev_k, False); st.rerun()
-        
+        # Usuario logueado, mostrar eventos
+        st.subheader(f"Gotitas de {USER_ID}")
+
+        # Mostrar eventos dinámicamente según las categorías
+        categorias = viaje.get("categorias", ["Cacas"])
+
+        for categoria in categorias:
+            if categoria in CATEGORIAS:
+                st.subheader(f"{CATEGORIAS[categoria]['emoji']} {categoria}")
+
+                eventos = CATEGORIAS[categoria]["eventos"]
+                num_eventos = len(eventos)
+                cols = st.columns(num_eventos)
+
+                for idx, (evento_key, evento_info) in enumerate(eventos.items()):
+                    with cols[idx]:
+                        contador = viaje["usuarios"][USER_ID]["eventos"].get(evento_key, 0)
+                        st.write(f"**{evento_info['emoji']} {evento_info['nombre']}**")
+                        row_cols = st.columns([1, 1, 1])
+                        with row_cols[0]:
+                            st.metric("Cantidad", contador)
+                        with row_cols[1]:
+                            if st.button(f"{evento_info['emoji']}", use_container_width=True, key=f"btn_add_{evento_key}"):
+                                registrar_evento(viaje["id"], USER_ID, evento_key)
+                                st.rerun()
+                        with row_cols[2]:
+                            if contador > 0:
+                                if st.button(f"🗑️ {evento_info['emoji']}", use_container_width=False, key=f"btn_del_{evento_key}"):
+                                    eliminar_evento(viaje["id"], USER_ID, evento_key)
+                                    st.rerun()
+
+        st.divider()
+
+        # Admin controls - Solo el usuario admin puede finalizar
         if USER_ID == viaje["admin"]:
-            if st.button("🏁 FINALIZAR VIAJE"):
-                actualizar_viaje(viaje["id"], {"activo": False}); st.rerun()
+            st.subheader("⚙️ Controles de Admin")
+            st.info(f"Eres el admin de este viaje. Solo tú puedes finalizarlo.")
+            if st.button("🏁 Finalizar Viaje", type="secondary"):
+                finalizar_viaje(viaje["id"])
+                st.success("Viaje finalizado. Ve a Reportes para ver las estadísticas.")
+                st.rerun()
     else: st.warning("No estás en ningún viaje activo.")
 
 elif page == "📈 Reportes":
