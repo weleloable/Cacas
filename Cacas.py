@@ -59,6 +59,26 @@ if st.session_state.user is None:
     except: pass
 
 # --- 3.1. PANTALLA DE AUTENTICACIÓN ---
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+def intentar_recuperar_sesion():
+    try:
+        # Esto busca el token guardado en las cookies/localstorage del navegador
+        res = supabase.auth.get_session()
+        if res and res.session:
+            # Si hay sesión activa en el navegador, la recuperamos
+            st.session_state.user = res.session.user
+            return True
+    except:
+        pass
+    return False
+
+# Ejecutamos la recuperación nada más cargar la app
+if st.session_state.user is None:
+    intentar_recuperar_sesion()
+
 if st.session_state.user is None:
     st.title("💧 Gotita")
     st.subheader("Login del Viaje")
