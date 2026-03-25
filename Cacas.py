@@ -167,7 +167,7 @@ def guardar_datos(datos):
         st.error(f"Error guardando datos: {e}")
 
 def añadir_usuario_a_viaje(viaje):
-    if USER_ID in viaje["usuarios"]:
+    if USER_NAME in viaje["usuarios"]:
         return True # Ya está dentro
     
     eventos_init = {}
@@ -175,7 +175,7 @@ def añadir_usuario_a_viaje(viaje):
         for ev_key in CATEGORIAS[cat]["eventos"]:
             eventos_init[ev_key] = 0
     
-    viaje["usuarios"][USER_ID] = {
+    viaje["usuarios"][USER_NAME] = {
         "nombre": USER_NAME,
         "eventos": eventos_init
     }
@@ -364,6 +364,7 @@ elif page == "📊 Mi Viaje":
                 st.success("Viaje finalizado. Ve a Reportes para ver las estadísticas.")
                 st.rerun()
     else: st.warning("No estás en ningún viaje activo.")
+
 
 elif page == "📈 Reportes":
     st.header("📊 Estadísticas Finales")
