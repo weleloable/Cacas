@@ -98,7 +98,7 @@ if st.session_state.user is None:
                         name_para_cookie = res.user.user_metadata.get('full_name')
                         # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
                         cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
-                        cookie_manager.set("gotita_user_name", name_para_cookie, expires_at=None)
+                        #cookie_manager.set("gotita_user_name", name_para_cookie, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
