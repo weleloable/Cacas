@@ -85,6 +85,7 @@ if st.session_state.user is None:
             if submit_l:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email_input, "password": pw_input})
+                    st.write(res)
                     if res.user:
                         # ✅ GUARDAMOS LA COOKIE (Dura 30 días)
                         cookie_manager.set("gotita_user_id", res.user.id, expires_at=None)
@@ -97,7 +98,7 @@ if st.session_state.user is None:
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
 curr_user = st.session_state.user
-st.write(res)
+
 USER_ID = curr_user.id
 USER_NAME = curr_user.user_metadata.get('full_name', curr_user.email)
 
