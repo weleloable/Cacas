@@ -136,7 +136,7 @@ def actualizar_viaje(viaje_id, campos):
 
 # --- 6. LÓGICA DE NEGOCIO (SIN CONTRASEÑAS) ---
 
-def crear_viaje(nombre_viaje, categorias_sel):
+def crear_viaje(nombre_viaje, categorias_sel, codigo_nuevo):
     nuevo_viaje = {
         "nombre": nombre_viaje,
         "admin": USER_NAME, # El admin es el email de Google
