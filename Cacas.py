@@ -88,7 +88,7 @@ if st.session_state.user is None:
                     if res.user:
                         # ✅ GUARDAMOS LA COOKIE (Dura 30 días)
                         cookie_manager.set("gotita_user_id", res.user.id, expires_at=None)
-                        st.session_state.user = res.user.id
+                        st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
                 except:
@@ -97,7 +97,7 @@ if st.session_state.user is None:
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
 curr_user = st.session_state.user
-USER_ID = curr_user
+USER_ID = curr_user.id
 USER_NAME = curr_user.user_metadata.get('full_name', curr_user.email)
 
 # --- 4. CONSTANTES ---
