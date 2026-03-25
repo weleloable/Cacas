@@ -1,5 +1,5 @@
 import streamlit as st
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
@@ -11,7 +11,21 @@ import time
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
+# Añade esto justo después de st.set_page_config
+import streamlit.components.v1 as components
 
+components.html(
+    """
+    <script>
+    document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === 'visible') {
+            window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
+        }
+    });
+    </script>
+    """,
+    height=0,
+)
 # Estilo CSS mejorado (Sin fondo fijo en Metric para evitar errores en modo oscuro)
 st.markdown("""
     <style>
@@ -45,10 +59,30 @@ try:
 except Exception as e:
     st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
+# Añadimos opciones para que no expire la sesión de red tan rápido
+opts = ClientOptions(
+    postgrest_client_timeout=20, # Más tiempo de espera para el móvil
+    persist_session=True         # Fuerza a guardar en el almacenamiento del navegador
+)
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=opts)
 
 # --- 3. GESTIÓN DE SESIÓN ---
 if "user" not in st.session_state:
     st.session_state.user = None
+
+# Si el estado dice que estamos logueados, pero Supabase da error, 
+# intentamos una "re-autenticación" silenciosa
+try:
+    # Solo intentamos recuperar si realmente no tenemos el usuario en el estado
+    if st.session_state.user is None:
+        sesion_db = supabase.auth.get_session()
+        if sesion_db and sesion_db.session:
+            st.session_state.user = sesion_db.session.user
+except Exception as e:
+    # Si hay un error de red al volver del segundo plano, 
+    # mantenemos lo que tenemos en el session_state
+    pass
 
 # --- REFUERZO DE PERSISTENCIA ---
 # Cada vez que Streamlit se "despierta", intentamos pedirle a Supabase 
