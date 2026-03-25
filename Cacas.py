@@ -91,7 +91,6 @@ if st.session_state.user is None:
             if submit_l:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email_input, "password": pw_input})
-                    st.write(res)
                     if res.user:
                         # Calculamos el identificador que usas en la base de datos
                         id_para_cookie = res.user.id
