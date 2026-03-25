@@ -1,17 +1,11 @@
-import os
 import streamlit as st
-from datetime import datetime
 from supabase import create_client, Client
-from streamlit_supabase_auth import login_form, logout_button
-import hashlib
+from datetime import datetime
 import pandas as pd
 import plotly.express as px
 # Obtener la URL actual de la app dinámicamente
 import urllib.parse
 
-
-# Esto te mostrará si hay algo en la URL que la app no está pillando
-st.write("Parámetros en la URL:", st.query_params)
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
@@ -34,58 +28,52 @@ except Exception as e:
     st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
 
-# --- 3. AUTENTICACIÓN ROBUSTA (MANUAL) ---
-
-# 1. Inicializar el usuario en el estado de la sesión
+# --- 3. GESTIÓN DE SESIÓN ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# 2. CAPTURAR EL TOKEN DE LA URL (Esto es lo que estaba fallando)
-# Supabase envía el token tras el '#' (fragmento), Streamlit a veces no lo ve fácil.
-# Intentamos forzar la lectura del fragmento de URL
-query_params = st.query_params
-
-# Si detectamos que hay un error o un access_token en la URL, intentamos loguear
-if not st.session_state.user:
+# Recuperar sesión automática (Persistencia)
+if st.session_state.user is None:
     try:
-        # El cliente de Supabase busca automáticamente en la URL y en LocalStorage
-        user_res = supabase.auth.get_user()
-        if user_res and user_res.user:
-            st.session_state.user = user_res.user
-    except:
-        pass
+        session = supabase.auth.get_session()
+        if session and session.user:
+            st.session_state.user = session.user
+    except: pass
 
-# 3. PANTALLA DE LOGIN (Si no hay usuario)
-if not st.session_state.user:
-    st.title("Gotita 💧")
-    st.write("Bienvenido. Para acceder a tus viajes, identifica tu cuenta de Google.")
+# --- 3.1. PANTALLA DE AUTENTICACIÓN ---
+if st.session_state.user is None:
+    st.title("💧 Gotita")
+    st.subheader("Login del Viaje")
     
-    # Creamos el enlace de login manualmente para tener control total
-    if st.button("Iniciar Sesión con Google", type="primary"):
-        # Generamos la URL de autenticación
-        auth_data = supabase.auth.sign_in_with_oauth({
-            "provider": "google",
-            "options": {
-                "redirect_to": "https://cacaculopedopis.streamlit.app/", # ASEGÚRATE QUE ES ESTA
-                "skip_nonce_check": True
-            }
-        })
-        # Redirección directa
-        st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_data.url}">', unsafe_allow_html=True)
-        st.write(f"Redirigiendo a Google... [Si no carga, pulsa aquí]({auth_data.url})")
-        st.stop()
+    tab_login, tab_signup = st.tabs(["🔑 Entrar", "📝 Registrarse"])
+    
+    with tab_login:
+        with st.form("l_form"):
+            email = st.text_input("Email")
+            pw = st.text_input("Contraseña", type="password")
+            if st.form_submit_button("Iniciar Sesión"):
+                try:
+                    res = supabase.auth.sign_in_with_password({"email": email, "password": pw})
+                    st.session_state.user = res.user
+                    st.rerun()
+                except: st.error("Datos incorrectos.")
+
+    with tab_signup:
+        with st.form("s_form"):
+            n_name = st.text_input("Tu nombre/apodo")
+            n_email = st.text_input("Email")
+            n_pw = st.text_input("Contraseña (mín. 6 car.)", type="password")
+            if st.form_submit_button("Crear Cuenta"):
+                try:
+                    supabase.auth.sign_up({"email": n_email, "password": n_pw, "options": {"data": {"full_name": n_name}}})
+                    st.success("¡Cuenta creada! Ya puedes loguearte.")
+                except Exception as e: st.error(f"Error: {e}")
     st.stop()
 
-# 4. SI LLEGAMOS AQUÍ, HAY USUARIO
-USER_EMAIL = st.session_state.user.email
-USER_NAME = st.session_state.user.user_metadata.get('full_name', USER_EMAIL.split('@')[0])
-
-with st.sidebar:
-    st.success(f"Conectado como {USER_NAME}")
-    if st.button("Cerrar Sesión"):
-        supabase.auth.sign_out()
-        st.session_state.user = None
-        st.rerun()
+# --- 3.2. LOGUEADO: DATOS DE USUARIO ---
+curr_user = st.session_state.user
+USER_ID = curr_user.id
+USER_NAME = curr_user.user_metadata.get('full_name', curr_user.email)
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
@@ -129,12 +117,12 @@ def actualizar_viaje(viaje_id, campos):
 def crear_viaje(nombre_viaje, categorias_sel):
     nuevo_viaje = {
         "nombre": nombre_viaje,
-        "admin": USER_EMAIL, # El admin es el email de Google
+        "admin": USER_ID, # El admin es el email de Google
         "fecha_creacion": datetime.now().isoformat(),
         "activo": True,
         "categorias": categorias_sel,
         "usuarios": {
-            USER_EMAIL: {
+            USER_ID: {
                 "nombre": USER_NAME,
                 "eventos": {ev: 0 for cat in categorias_sel for ev in CATEGORIAS[cat]["eventos"]}
             }
@@ -145,7 +133,7 @@ def crear_viaje(nombre_viaje, categorias_sel):
     return res.data[0]
 
 def añadir_usuario_a_viaje(viaje):
-    if USER_EMAIL in viaje["usuarios"]:
+    if USER_ID in viaje["usuarios"]:
         return True # Ya está dentro
     
     eventos_init = {}
@@ -153,7 +141,7 @@ def añadir_usuario_a_viaje(viaje):
         for ev_key in CATEGORIAS[cat]["eventos"]:
             eventos_init[ev_key] = 0
     
-    viaje["usuarios"][USER_EMAIL] = {
+    viaje["usuarios"][USER_ID] = {
         "nombre": USER_NAME,
         "eventos": eventos_init
     }
@@ -162,10 +150,10 @@ def añadir_usuario_a_viaje(viaje):
 
 def modificar_evento(viaje_id, tipo_evento, incremento=True):
     viaje = cargar_un_viaje(viaje_id)
-    actual = viaje["usuarios"][USER_EMAIL]["eventos"].get(tipo_evento, 0)
+    actual = viaje["usuarios"][USER_ID]["eventos"].get(tipo_evento, 0)
     nuevo_valor = actual + 1 if incremento else max(0, actual - 1)
     
-    viaje["usuarios"][USER_EMAIL]["eventos"][tipo_evento] = nuevo_valor
+    viaje["usuarios"][USER_ID]["eventos"][tipo_evento] = nuevo_valor
     actualizar_viaje(viaje_id, {"usuarios": viaje["usuarios"]})
 
 # --- 7. IA CON LLAMA 3.3 ---
@@ -244,7 +232,7 @@ elif page == "📋 Unirme":
 
 elif page == "📊 Mi Viaje":
     activos = cargar_viajes_activos()
-    viajes_donde_estoy = [v for v in activos if USER_EMAIL in v["usuarios"]]
+    viajes_donde_estoy = [v for v in activos if USER_ID in v["usuarios"]]
     
     if viajes_donde_estoy:
         v_obj = st.selectbox("Viaje actual:", viajes_donde_estoy, format_func=lambda x: x['nombre'])
@@ -257,7 +245,7 @@ elif page == "📊 Mi Viaje":
             cols = st.columns(len(evs))
             for i, (ev_k, ev_v) in enumerate(evs.items()):
                 with cols[i]:
-                    valor = viaje["usuarios"][USER_EMAIL]["eventos"].get(ev_k, 0)
+                    valor = viaje["usuarios"][USER_ID]["eventos"].get(ev_k, 0)
                     st.metric(ev_v["nombre"], valor)
                     c1, c2 = st.columns(2)
                     if c1.button(f"➕", key=f"add_{ev_k}"):
@@ -265,7 +253,7 @@ elif page == "📊 Mi Viaje":
                     if c2.button(f"➖", key=f"sub_{ev_k}"):
                         modificar_evento(viaje["id"], ev_k, False); st.rerun()
         
-        if USER_EMAIL == viaje["admin"]:
+        if USER_ID == viaje["admin"]:
             if st.button("🏁 FINALIZAR VIAJE"):
                 actualizar_viaje(viaje["id"], {"activo": False}); st.rerun()
     else: st.warning("No estás en ningún viaje activo.")
