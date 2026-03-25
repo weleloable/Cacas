@@ -64,7 +64,12 @@ if saved_user_id and st.session_state.user is None:
 # --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
 with st.sidebar:
     if st.session_state.user is not None:
-        st.write(f"✅ Sesión activa: {st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)}")
+        # Verificamos si el usuario es un objeto de Supabase o un string de la cookie
+        if isinstance(st.session_state.user, str):
+            st.write(f"✅ Sesión recordada: {st.session_state.user}")
+        else:
+            nombre_display = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
+            st.write(f"✅ Sesión activa: {nombre_display}")
     else:
         st.write("🔒 No hay sesión iniciada")
 
@@ -99,8 +104,12 @@ if st.session_state.user is None:
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
 
-USER_ID = st.session_state.user.id
-USER_NAME = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
+if isinstance(st.session_state.user, str):
+    USER_ID = None
+    USER_NAME = st.session_state.user
+else:
+    USER_ID = st.session_state.user.id
+    USER_NAME = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
