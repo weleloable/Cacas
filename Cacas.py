@@ -61,7 +61,7 @@ except Exception as e:
     st.stop()
 # Añadimos opciones para que no expire la sesión de red tan rápido
 opts = ClientOptions(
-    postgrest_client_timeout=20, # Más tiempo de espera para el móvil
+    postgrest_client_timeout=200, # Más tiempo de espera para el móvil
     persist_session=True         # Fuerza a guardar en el almacenamiento del navegador
 )
 
