@@ -61,38 +61,43 @@ except Exception as e:
     st.stop()
 # Añadimos opciones para que no expire la sesión de red tan rápido
 opts = ClientOptions(
-    postgrest_client_timeout=200, # Más tiempo de espera para el móvil
+    postgrest_client_timeout=20, # Más tiempo de espera para el móvil
     persist_session=True         # Fuerza a guardar en el almacenamiento del navegador
 )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=opts)
 
-# --- 3. GESTIÓN DE SESIÓN INTELIGENTE ---
+# --- 3. GESTIÓN DE SESIÓN ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Intentamos validar la sesión con Supabase
+# Si el estado dice que estamos logueados, pero Supabase da error, 
+# intentamos una "re-autenticación" silenciosa
 try:
-    # get_session() es la prueba de fuego
-    res_session = supabase.auth.get_session()
-    
-    if res_session and res_session.session:
-        # Si Supabase confirma que hay sesión, actualizamos el estado
-        st.session_state.user = res_session.session.user
-    else:
-        # Si Supabase dice que NO hay sesión, limpiamos Streamlit
-        st.session_state.user = None
-except Exception:
-    # Si hay un error de red o de comunicación, 
-    # por seguridad decimos que no hay usuario para evitar el bloqueo
-    st.session_state.user = None
+    # Solo intentamos recuperar si realmente no tenemos el usuario en el estado
+    if st.session_state.user is None:
+        sesion_db = supabase.auth.get_session()
+        if sesion_db and sesion_db.session:
+            st.session_state.user = sesion_db.session.user
+except Exception as e:
+    # Si hay un error de red al volver del segundo plano, 
+    # mantenemos lo que tenemos en el session_state
+    pass
 
-# --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
-with st.sidebar:
-    if st.session_state.user:
-        st.write(f"✅ Sesión activa: {st.session_state.user.email}")
-    else:
-        st.write("🔒 No hay sesión iniciada")
+# --- REFUERZO DE PERSISTENCIA ---
+# Cada vez que Streamlit se "despierta", intentamos pedirle a Supabase 
+# que busque el token que dejó guardado en el navegador.
+
+if st.session_state.user is None:
+    try:
+        # get_session() es síncrono y busca en el almacenamiento local
+        session_activa = supabase.auth.get_session()
+        if session_activa and session_activa.session:
+            st.session_state.user = session_activa.session.user
+            # Opcional: st.rerun() para limpiar la pantalla de login de inmediato
+    except Exception as e:
+        # Si falla (ej. token caducado), no hacemos nada y pedirá login
+        pass
 
 # --- 3.1. PANTALLA DE AUTENTICACIÓN ---
 
