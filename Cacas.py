@@ -52,6 +52,7 @@ except Exception as e:
 # --- 3. GESTIÓN DE SESIÓN CON COOKIES ---
 # Intentamos leer la cookie "gotita_user_id" del navegador
 saved_user_id = cookie_manager.get(cookie="gotita_user_id")
+saved_user_name = cookie_manager.get(cookie="gotita_user_name")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -66,7 +67,7 @@ with st.sidebar:
     if st.session_state.user is not None:
         # Verificamos si el usuario es un objeto de Supabase o un string de la cookie
         if isinstance(st.session_state.user, str):
-            st.write(f"✅ Sesión recordada: {st.session_state}")
+            st.write(f"✅ Sesión recordada: {saved_user_name}")
         else:
             nombre_display = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
             st.write(f"✅ Sesión activa: {nombre_display}")
@@ -93,9 +94,10 @@ if st.session_state.user is None:
                     if res.user:
                         # Calculamos el identificador que usas en la base de datos
                         id_para_cookie = res.user.user_metadata.get('full_name', res.user.email)
-                        st.write(res)
+                        name_para_cookie = res.user.user_metadata.get('full_name', res.user.email)
                         # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
                         cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
+                        cookie_manager.set("gotita_user_name", name_para_cookie, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
@@ -299,6 +301,8 @@ with st.sidebar:
     if st.button("Cerrar Sesión"):
         supabase.auth.sign_out()
         st.session_state.user = None
+        cookie_manager.delete("gotita_user_id")
+        cookie_manager.delete("gotita_user_name")
         st.rerun()
     st.divider()
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
