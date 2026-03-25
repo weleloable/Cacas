@@ -85,15 +85,15 @@ if st.session_state.user is None:
             if submit_l:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email_input, "password": pw_input})
-                    st.write(res)
                     if res.user:
                         # ✅ GUARDAMOS LA COOKIE (Dura 30 días)
                         cookie_manager.set("gotita_user_id", res.user.id, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
-                except:
+                except Exception as e:
                     st.error("Datos incorrectos")
+                    st.write("Estamos aqui dentro???", e)
     st.stop()
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
