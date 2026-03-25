@@ -67,26 +67,27 @@ if st.session_state.user is None:
     
     with tab_login:
         with st.form("l_form"):
-            email = st.text_input("Email")
-            pw = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Iniciar Sesión"):
+            email_input = st.text_input("Email")
+            pw_input = st.text_input("Contraseña", type="password")
+            submit_l = st.form_submit_button("Iniciar Sesión", type="primary")
+            
+            if submit_l:
                 try:
-                    res = supabase.auth.sign_in_with_password({"email": email, "password": pw})
-                    st.session_state.user = res.user
-                    time.sleep(1)
-                    st.rerun()
-                except: st.error("Datos incorrectos.")
-
-    with tab_signup:
-        with st.form("s_form"):
-            n_name = st.text_input("Tu nombre/apodo")
-            n_email = st.text_input("Email")
-            n_pw = st.text_input("Contraseña (mín. 6 car.)", type="password")
-            if st.form_submit_button("Crear Cuenta"):
-                try:
-                    supabase.auth.sign_up({"email": n_email, "password": n_pw, "options": {"data": {"full_name": n_name}}})
-                    st.success("¡Cuenta creada! Ya puedes loguearte.")
-                except Exception as e: st.error(f"Error: {e}")
+                    # 1. Intentamos el login
+                    res = supabase.auth.sign_in_with_password({
+                        "email": email_input, 
+                        "password": pw_input
+                    })
+                    
+                    if res.user:
+                        # 2. FORZAMOS el guardado en el estado de Streamlit
+                        st.session_state.user = res.user
+                        st.success("¡Sesión iniciada! Entrando...")
+                        # 3. Recargamos la app para que salte a la interfaz logueada
+                        st.rerun()
+                except Exception as e:
+                    # Si falla de verdad, mostramos el error
+                    st.error("Email o contraseña incorrectos. Revisa los datos.")
     st.stop()
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
