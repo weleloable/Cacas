@@ -316,7 +316,7 @@ elif page == "📋 Unirme":
 
 elif page == "📊 Mi Viaje":
     activos = cargar_viajes_activos()
-    viajes_donde_estoy = [v for v in activos if USER_ID in v["usuarios"]]
+    viajes_donde_estoy = [v for v in activos if USER_NAME in v["usuarios"]]
     
     if viajes_donde_estoy:
         v_obj = st.selectbox("Viaje actual:", viajes_donde_estoy, format_func=lambda x: x['nombre'])
@@ -356,7 +356,7 @@ elif page == "📊 Mi Viaje":
         st.divider()
 
         # Admin controls - Solo el usuario admin puede finalizar
-        if USER_ID == viaje["admin"]:
+        if USER_NAME == viaje["admin"]:
             st.subheader("⚙️ Controles de Admin")
             st.info(f"Eres el admin de este viaje. Solo tú puedes finalizarlo.")
             if st.button("🏁 Finalizar Viaje", type="secondary"):
