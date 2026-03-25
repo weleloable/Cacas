@@ -76,14 +76,24 @@ if "user" not in st.session_state:
 try:
     # Solo intentamos recuperar si realmente no tenemos el usuario en el estado
     if st.session_state.user is None:
+        # get_session() es la prueba de fuego
         sesion_db = supabase.auth.get_session()
         if sesion_db and sesion_db.session:
             st.session_state.user = sesion_db.session.user
+        else:
+            # Si Supabase dice que NO hay sesión, limpiamos Streamlit
+            st.session_state.user = None
 except Exception as e:
     # Si hay un error de red al volver del segundo plano, 
     # mantenemos lo que tenemos en el session_state
     pass
 
+# --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
+with st.sidebar:
+    if st.session_state.user:
+        st.write(f"✅ Sesión activa: {st.session_state.user.email}")
+    else:
+        st.write("🔒 No hay sesión iniciada")
 # --- REFUERZO DE PERSISTENCIA ---
 # Cada vez que Streamlit se "despierta", intentamos pedirle a Supabase 
 # que busque el token que dejó guardado en el navegador.
