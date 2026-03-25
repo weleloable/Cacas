@@ -73,7 +73,7 @@ if st.session_state.user is None:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": pw})
                     st.session_state.user = res.user
-                    time.sleep(0.5)
+                    time.sleep(1)
                     st.rerun()
                 except: st.error("Datos incorrectos.")
 
