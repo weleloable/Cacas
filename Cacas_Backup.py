@@ -12,6 +12,14 @@ except ImportError:
 
 #EAM probando push desde vscode a github para ver si se actualiza el proyecto en streamlit cloud 
 
+# Estilo CSS para botones y tablas compactas
+st.markdown("""
+    <style>
+    div.stButton > button { height: 3.5em; width: 100%; border-radius: 10px; font-weight: bold; }
+    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .stDataFrame td, .stDataFrame th { padding: 2px 5px !important; font-size: 14px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Configuración de Supabase
 try:
@@ -430,7 +438,7 @@ elif page == "📊 Mi Viaje":
             viaje_key = f"{viaje['id']}_{usuario}"
             if st.session_state.logged_in.get(viaje_key, False):
                 # Usuario logueado, mostrar eventos
-                st.subheader(f"Eventos de {usuario}")
+                st.subheader(f"Gotitas de {usuario}")
 
                 # Mostrar eventos dinámicamente según las categorías
                 categorias = viaje.get("categorias", ["Cacas"])

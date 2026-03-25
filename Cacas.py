@@ -50,13 +50,20 @@ except Exception as e:
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Recuperar sesión automática (Persistencia)
+# --- REFUERZO DE PERSISTENCIA ---
+# Cada vez que Streamlit se "despierta", intentamos pedirle a Supabase 
+# que busque el token que dejó guardado en el navegador.
+
 if st.session_state.user is None:
     try:
-        session = supabase.auth.get_session()
-        if session and session.user:
-            st.session_state.user = session.user
-    except: pass
+        # get_session() es síncrono y busca en el almacenamiento local
+        session_activa = supabase.auth.get_session()
+        if session_activa and session_activa.session:
+            st.session_state.user = session_activa.session.user
+            # Opcional: st.rerun() para limpiar la pantalla de login de inmediato
+    except Exception as e:
+        # Si falla (ej. token caducado), no hacemos nada y pedirá login
+        pass
 
 # --- 3.1. PANTALLA DE AUTENTICACIÓN ---
 
@@ -308,6 +315,13 @@ with st.sidebar:
     st.divider()
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
+    st.write(f"Estado de Session State: {'Lleno' if st.session_state.user else 'Vacío'}")
+    # Esto nos dirá si Supabase detecta algo en el navegador
+    try:
+        check_auth = supabase.auth.get_session()
+        st.write(f"Supabase detecta sesión: {'SÍ' if check_auth.session else 'NO'}")
+    except:
+        st.write("Error al consultar Supabase")
 if page == "🏠 Inicio":
     st.header(f"¡Hola, {USER_NAME.split()[0]}! ¡Bienvenido a Gotita!")
     st.write("""
