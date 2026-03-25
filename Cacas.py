@@ -12,8 +12,7 @@ import extra_streamlit_components as stx  # <--- NUEVA LIBRERÍA
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
 # Inicializamos el gestor de cookies
-cookie_manager_id = stx.CookieManager()
-cookie_manager_name = stx.CookieManager()
+cookie_manager = stx.CookieManager() # Usa una única instancia de CookieManager
 
 
 # Estilo CSS mejorado (Sin fondo fijo en Metric para evitar errores en modo oscuro)
@@ -52,16 +51,16 @@ except Exception as e:
 
 # --- 3. GESTIÓN DE SESIÓN CON COOKIES ---
 # Intentamos leer la cookie "gotita_user_id" del navegador
-saved_user_id = cookie_manager_id.get(cookie="gotita_user_id")
-saved_user_name = cookie_manager_name.get(cookie="gotita_user_name")
+saved_user_id = cookie_manager.get(cookie="gotita_user_id")
+saved_user_name = cookie_manager.get(cookie="gotita_user_name")
 
 if "user" not in st.session_state:
     st.session_state.user = None
 # Si hay una cookie pero no está en el session_state, la recuperamos
-if saved_user_id and st.session_state.user is None:
+if saved_user_name and st.session_state.user is None: # Si hay un nombre guardado, recuperamos la sesión
     # Opcional: Podrías buscar al usuario en la DB, pero por ahora
     # asumimos que si tiene la cookie, es que se logueó.
-    st.session_state.user = saved_user_id
+    st.session_state.user = saved_user_name # Asignamos el nombre de usuario a session_state.user
 
 # --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
 with st.sidebar:
@@ -98,8 +97,8 @@ if st.session_state.user is None:
                         id_para_cookie = res.user.id
                         name_para_cookie = res.user.user_metadata.get('full_name')
                         # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
-                        cookie_manager_id.set("gotita_user_id", id_para_cookie, expires_at=None)
-                        cookie_manager_name.set("gotita_user_name", name_para_cookie, expires_at=None)
+                        cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
+                        cookie_manager.set("gotita_user_name", name_para_cookie, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
@@ -304,8 +303,8 @@ with st.sidebar:
     if st.button("Cerrar Sesión"):
         supabase.auth.sign_out()
         st.session_state.user = None
-        cookie_manager.delete("gotita_user_id")
-        cookie_manager.delete("gotita_user_name")
+        cookie_manager.delete(cookie="gotita_user_id") # Usar la única instancia para borrar
+        cookie_manager.delete(cookie="gotita_user_name") # Usar la única instancia para borrar
         st.rerun()
     st.divider()
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
