@@ -3,29 +3,18 @@ from supabase import create_client, Client, ClientOptions
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-# Obtener la URL actual de la app dinámicamente
 import urllib.parse
 import random
 import string
 import time
+import extra_streamlit_components as stx  # <--- NUEVA LIBRERÍA
 
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
-# Añade esto justo después de st.set_page_config
-import streamlit.components.v1 as components
+# Inicializamos el gestor de cookies
+cookie_manager = stx.CookieManager()
 
-components.html(
-    """
-    <script>
-    document.addEventListener("visibilitychange", function() {
-        if (document.visibilityState === 'visible') {
-            window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
-        }
-    });
-    </script>
-    """,
-    height=0,
-)
+
 # Estilo CSS mejorado (Sin fondo fijo en Metric para evitar errores en modo oscuro)
 st.markdown("""
     <style>
@@ -59,34 +48,18 @@ try:
 except Exception as e:
     st.error("Error de conexión. Revisa tus Secrets.")
     st.stop()
-# Añadimos opciones para que no expire la sesión de red tan rápido
-opts = ClientOptions(
-    postgrest_client_timeout=20, # Más tiempo de espera para el móvil
-    persist_session=True         # Fuerza a guardar en el almacenamiento del navegador
-)
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=opts)
+# --- 3. GESTIÓN DE SESIÓN CON COOKIES ---
+# Intentamos leer la cookie "gotita_user_id" del navegador
+saved_user_id = cookie_manager.get(cookie="gotita_user_id")
 
-# --- 3. GESTIÓN DE SESIÓN ---
 if "user" not in st.session_state:
     st.session_state.user = None
-
-# Si el estado dice que estamos logueados, pero Supabase da error, 
-# intentamos una "re-autenticación" silenciosa
-try:
-    # Solo intentamos recuperar si realmente no tenemos el usuario en el estado
-    if st.session_state.user is None:
-        # get_session() es la prueba de fuego
-        sesion_db = supabase.auth.get_session()
-        if sesion_db and sesion_db.session:
-            st.session_state.user = sesion_db.session.user
-        else:
-            # Si Supabase dice que NO hay sesión, limpiamos Streamlit
-            st.session_state.user = None
-except Exception as e:
-    # Si hay un error de red al volver del segundo plano, 
-    # mantenemos lo que tenemos en el session_state
-    pass
+# Si hay una cookie pero no está en el session_state, la recuperamos
+if saved_user_id and st.session_state.user is None:
+    # Opcional: Podrías buscar al usuario en la DB, pero por ahora
+    # asumimos que si tiene la cookie, es que se logueó.
+    st.session_state.user = saved_user_id
 
 # --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
 with st.sidebar:
@@ -94,49 +67,14 @@ with st.sidebar:
         st.write(f"✅ Sesión activa: {st.session_state.user.email}")
     else:
         st.write("🔒 No hay sesión iniciada")
-# --- REFUERZO DE PERSISTENCIA ---
-# Cada vez que Streamlit se "despierta", intentamos pedirle a Supabase 
-# que busque el token que dejó guardado en el navegador.
-
-if st.session_state.user is None:
-    try:
-        # get_session() es síncrono y busca en el almacenamiento local
-        session_activa = supabase.auth.get_session()
-        if session_activa and session_activa.session:
-            st.session_state.user = session_activa.session.user
-            # Opcional: st.rerun() para limpiar la pantalla de login de inmediato
-    except Exception as e:
-        # Si falla (ej. token caducado), no hacemos nada y pedirá login
-        pass
 
 # --- 3.1. PANTALLA DE AUTENTICACIÓN ---
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-def intentar_recuperar_sesion():
-    try:
-        # Esto busca el token guardado en las cookies/localstorage del navegador
-        res = supabase.auth.get_session()
-        if res and res.session:
-            # Si hay sesión activa en el navegador, la recuperamos
-            st.session_state.user = res.session.user
-            return True
-    except:
-        pass
-    return False
-
-# Ejecutamos la recuperación nada más cargar la app
-if st.session_state.user is None:
-    intentar_recuperar_sesion()
-    #st.rerun()
-
 
 if st.session_state.user is None:
     st.title("💧 Gotita")
     st.subheader("Login del Viaje")
     
-    tab_login, tab_signup = st.tabs(["🔑 Entrar", "📝 Registrarse"])
+    tab_login, tab_signup = st.tabs(["🔑 Entrar y recordar", "📝 Registrarse"])
     
     with tab_login:
         with st.form("l_form"):
@@ -146,21 +84,15 @@ if st.session_state.user is None:
             
             if submit_l:
                 try:
-                    # 1. Intentamos el login
-                    res = supabase.auth.sign_in_with_password({
-                        "email": email_input, 
-                        "password": pw_input
-                    })
-                    
+                    res = supabase.auth.sign_in_with_password({"email": email_input, "password": pw_input})
                     if res.user:
-                        # 2. FORZAMOS el guardado en el estado de Streamlit
-                        st.session_state.user = res.user
-                        st.success("¡Sesión iniciada! Entrando...")
-                        # 3. Recargamos la app para que salte a la interfaz logueada
+                        # ✅ GUARDAMOS LA COOKIE (Dura 30 días)
+                        cookie_manager.set("gotita_user_id", res.user.id, expires_at=None)
+                        st.session_state.user = res.user.id
+                        st.success("¡Login correcto!")
                         st.rerun()
-                except Exception as e:
-                    # Si falla de verdad, mostramos el error
-                    st.error("Email o contraseña incorrectos. Revisa los datos.")
+                except:
+                    st.error("Datos incorrectos")
     st.stop()
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
