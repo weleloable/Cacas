@@ -208,9 +208,7 @@ with st.sidebar:
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
 if page == "🏠 Inicio":
-    st.header(f"¡Hola, {USER_NAME.split()[0]}!")
-    st.write("Gestiona tus viajes compartidos y mantén el conteo de eventos con tus amigos de forma automática.")
-    st.header("¡Bienvenido a Gotita!")
+    st.header(f"¡Hola, {USER_NAME.split()[0]}! ¡Bienvenido a Gotita!")
     st.write("""
     Esta aplicación te permite:
     - 🏖️ Crear viajes con tus amigos
