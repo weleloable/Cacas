@@ -200,7 +200,10 @@ st.markdown(f"""
 # Sidebar
 with st.sidebar:
     st.write(f"👤 **{USER_NAME}**")
-    if logout_button(): st.rerun()
+    if st.button("Cerrar Sesión"):
+        supabase.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
     st.divider()
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
