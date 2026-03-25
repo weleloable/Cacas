@@ -12,7 +12,8 @@ import extra_streamlit_components as stx  # <--- NUEVA LIBRERÍA
 # --- 1. CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Gotita", page_icon="💧", layout="wide")
 # Inicializamos el gestor de cookies
-cookie_manager = stx.CookieManager()
+cookie_manager_id = stx.CookieManager()
+cookie_manager_name = stx.CookieManager()
 
 
 # Estilo CSS mejorado (Sin fondo fijo en Metric para evitar errores en modo oscuro)
@@ -51,8 +52,8 @@ except Exception as e:
 
 # --- 3. GESTIÓN DE SESIÓN CON COOKIES ---
 # Intentamos leer la cookie "gotita_user_id" del navegador
-saved_user_id = cookie_manager.get(cookie="gotita_user_id")
-saved_user_name = cookie_manager.get(cookie="gotita_user_name")
+saved_user_id = cookie_manager_id.get(cookie="gotita_user_id")
+saved_user_name = cookie_manager_name.get(cookie="gotita_user_name")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -97,8 +98,8 @@ if st.session_state.user is None:
                         id_para_cookie = res.user.id
                         name_para_cookie = res.user.user_metadata.get('full_name')
                         # ✅ GUARDAMOS EL NOMBRE/EMAIL EN LA COOKIE
-                        cookie_manager.set("gotita_user_id", id_para_cookie, expires_at=None)
-                        #cookie_manager.set("gotita_user_name", name_para_cookie, expires_at=None)
+                        cookie_manager_id.set("gotita_user_id", id_para_cookie, expires_at=None)
+                        cookie_manager_name.set("gotita_user_name", name_para_cookie, expires_at=None)
                         st.session_state.user = res.user
                         st.success("¡Login correcto!")
                         st.rerun()
