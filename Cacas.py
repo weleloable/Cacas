@@ -97,10 +97,9 @@ if st.session_state.user is None:
     st.stop()
 
 # --- 3.2. LOGUEADO: DATOS DE USUARIO ---
-curr_user = st.session_state.user
 
-USER_ID = curr_user.id
-USER_NAME = curr_user.user_metadata.get('full_name', curr_user.email)
+USER_ID = st.session_state.user.id
+USER_NAME = st.session_state.user.user_metadata.get('full_name', st.session_state.user.email)
 
 # --- 4. CONSTANTES ---
 CATEGORIAS = {
