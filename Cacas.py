@@ -64,7 +64,7 @@ if saved_user_id and st.session_state.user is None:
 # --- DIAGNÓSTICO (Puedes borrar esto cuando funcione) ---
 with st.sidebar:
     if st.session_state.user:
-        st.write(f"✅ Sesión activa: {st.session_state.user.email}")
+        st.write(f"✅ Sesión activa: {st.session_state.user}")
     else:
         st.write("🔒 No hay sesión iniciada")
 
