@@ -78,7 +78,7 @@ def intentar_recuperar_sesion():
 # Ejecutamos la recuperación nada más cargar la app
 if st.session_state.user is None:
     intentar_recuperar_sesion()
-    st.rerun()
+    #st.rerun()
 
 
 if st.session_state.user is None:
