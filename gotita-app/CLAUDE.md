@@ -86,6 +86,16 @@ Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
 - `unirme.tsx` se queda FUERA de las pestañas (ruta suelta, empujada con
   `router.push('/unirme')` desde "Mis viajes" y desde el estado vacío de "Mi
   Viaje"): es una acción puntual, no un sitio en el que uno "vive".
+- `ViajesProvider` vive en el `_layout.tsx` RAÍZ, no dentro de
+  `(tabs)/_layout.tsx`. `unirme` es una ruta HERMANA de `(tabs)` en el mismo
+  Stack, no una descendiente suya: aunque las dos convivan montadas a la vez
+  (un Stack no desmonta la pantalla de debajo al empujar otra encima), el
+  contexto sólo llega a través del árbol de componentes, no por estar en el
+  mismo Stack. Ponerlo sólo alrededor de `<Tabs>` habría dejado a
+  `unirme.tsx` sin forma de avisar de un viaje nuevo — justo el bug que hubo
+  aquí la primera vez: unirse escribía en Supabase pero "Mi Viaje" seguía
+  enseñando el viaje anterior hasta un pull-to-refresh, porque las pestañas
+  no se remontan al navegar entre ellas.
 - Perfil permite cambiar el nombre. Eso NO es sólo `auth.updateUser`: el
   nombre de cada viaje es una copia guardada en su JSON `usuarios` (ver
   "Decisiones tomadas"), así que `actualizarNombreEnMisViajes` (lib/viajes.ts)
@@ -101,9 +111,18 @@ Gota dibujada por vector en `scripts/generar-iconos.py` (no un emoji, no una
 imagen de origen): silueta hueca, trazo negro de grosor medio, fondo y
 relleno transparentes. Cada tamaño se genera de cero con su propio grosor
 proporcional — redimensionar un único master deja un trazo fino borroso o
-dentado. El `apple-touch-icon` es la única excepción: va sobre fondo blanco
-porque iOS no respeta el canal alfa (pinta el hueco de negro). Para
-regenerarlo tras tocar la geometría: `npm run iconos`.
+dentado. Dos excepciones, ambas por limitación de la plataforma, no por
+gusto:
+
+- `apple-touch-icon` va sobre fondo blanco porque iOS no respeta el canal
+  alfa (pinta el hueco de negro; negro sobre negro sería invisible).
+- `android-icon-foreground.png` lleva trazo BLANCO, no negro: es la capa
+  "foreground" del icono adaptativo de Android, que se compone sobre
+  `android.adaptiveIcon.backgroundColor` de `app.json` (`#0B1020`, el mismo
+  azul-negro de la app) — no sobre transparente de verdad. Negro sobre ese
+  fondo da un contraste de ~1.1:1, invisible en el launcher.
+
+Para regenerarlo tras tocar la geometría: `npm run iconos`.
 
 ## Confirmación al restar
 
@@ -158,6 +177,10 @@ regenerarlo tras tocar la geometría: `npm run iconos`.
   con el `ViajesProvider` real (no una versión de mentira del contexto).
 - `viajes.test.ts` — `modificarEvento` y `actualizarNombreEnMisViajes`
   ejecutando la implementación real, mockeando sólo `supabase`.
+- `unirme.test.tsx` — monta `Unirme` y "Mi Viaje" JUNTAS bajo el mismo
+  `ViajesProvider`, sin desmontar entre medias (así es como conviven de
+  verdad dos rutas del mismo Stack). Un test que renderizase `unirme.tsx`
+  sola no habría detectado que unirse no avisaba al contexto compartido.
 
 ## Nota para quien edite este fichero con un script
 

@@ -64,6 +64,7 @@ export default function PantallaMisViajes() {
           return (
             <Pressable
               key={v.id}
+              testID={`viaje-${v.id}`}
               onPress={() => elegir(v.id)}
               accessibilityRole="button"
               style={[estilos.tarjeta, activo && estilos.tarjetaActiva]}>

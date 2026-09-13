@@ -2,7 +2,7 @@
  * Tests de la pestaña "Mis viajes": listar, marcar como activo y navegar a
  * "Mi Viaje" al elegir uno.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 const USUARIO = '11111111-1111-1111-1111-111111111111';
@@ -68,22 +68,25 @@ describe('Mis viajes', () => {
 
     expect(screen.getByText('Cangas')).toBeTruthy();
     expect(screen.getByText('Oktoberfest')).toBeTruthy();
-    expect(screen.getByText('Activo')).toBeTruthy(); // sólo hay una insignia
+    // No basta con que exista una insignia "Activo" en algún sitio de la
+    // pantalla: tiene que colgar de la tarjeta correcta. Contar sólo el
+    // total dejaría pasar la insignia congelada en la tarjeta equivocada.
+    expect(within(screen.getByTestId('viaje-1')).getByText('Activo')).toBeTruthy();
+    expect(within(screen.getByTestId('viaje-2')).queryByText('Activo')).toBeNull();
   });
 
-  it('tocar un viaje distinto lo marca activo y navega a Mi Viaje', async () => {
+  it('tocar un viaje distinto mueve la insignia a su tarjeta y navega a Mi Viaje', async () => {
     await act(async () => {
       renderPantalla();
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Oktoberfest'));
+      fireEvent.press(screen.getByTestId('viaje-2'));
     });
 
     expect(mockPush).toHaveBeenCalledWith('/viaje');
-    // La insignia "Activo" ahora cuelga de la tarjeta de Oktoberfest: sigue
-    // habiendo sólo una en toda la pantalla.
-    expect(screen.getAllByText('Activo')).toHaveLength(1);
+    expect(within(screen.getByTestId('viaje-2')).getByText('Activo')).toBeTruthy();
+    expect(within(screen.getByTestId('viaje-1')).queryByText('Activo')).toBeNull();
   });
 
   it('sin viajes, enseña el estado vacío y no una lista rota', async () => {

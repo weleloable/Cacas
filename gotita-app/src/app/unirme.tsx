@@ -14,9 +14,11 @@ import {
 import { useAuth } from '@/lib/auth';
 import { radio, tema } from '@/lib/tema';
 import { buscarPorCodigo, unirseAViaje } from '@/lib/viajes';
+import { useViajes } from '@/lib/viajesContext';
 
 export default function Unirme() {
   const { userId, nombreUsuario } = useAuth();
+  const { setViajes, setViajeActivoId } = useViajes();
 
   const [codigo, setCodigo] = useState('');
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
@@ -40,7 +42,16 @@ export default function Unirme() {
         });
         return;
       }
-      await unirseAViaje(viaje, userId, nombreUsuario);
+      const actualizado = await unirseAViaje(viaje, userId, nombreUsuario);
+      // "Mi Viaje" lee del contexto compartido, no vuelve a pedir nada al
+      // montarse (las pestañas no se desmontan al navegar entre ellas): sin
+      // esto, el viaje recién unido no aparecía ahí hasta un pull-to-refresh.
+      setViajes((previos) =>
+        previos.some((v) => v.id === actualizado.id)
+          ? previos.map((v) => (v.id === actualizado.id ? actualizado : v))
+          : [actualizado, ...previos]
+      );
+      setViajeActivoId(actualizado.id);
       setMensaje({ tipo: 'ok', texto: `¡Dentro de ${viaje.nombre}! 🎉` });
       setTimeout(() => router.replace('/viaje'), 700);
     } catch (e) {

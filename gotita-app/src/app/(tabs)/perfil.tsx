@@ -38,18 +38,35 @@ export default function Perfil() {
     }
     setGuardando(true);
     setMensaje(null);
+    // Primero la cuenta (afecta al saludo y a los viajes a los que te unas de
+    // aquí en adelante); luego los viajes en los que ya estás, que son una
+    // copia aparte del nombre y no se actualizan solas. Van en pasos
+    // separados, no en un único try, porque si el segundo paso falla la
+    // cuenta ya se guardó: decir "no se ha podido guardar" sería mentira.
     try {
-      // Primero la cuenta (afecta al saludo y a los viajes a los que te unas
-      // de aquí en adelante), luego los viajes en los que ya estás: son una
-      // copia aparte del nombre, no se actualizan solas.
       await actualizarNombre(limpio);
+    } catch (e) {
+      setGuardando(false);
+      setMensaje({
+        tipo: 'error',
+        texto: e instanceof Error ? e.message : 'No se ha podido guardar el nombre.',
+      });
+      return;
+    }
+    try {
       await actualizarNombreEnMisViajes(userId, limpio);
       await recargar();
       setMensaje({ tipo: 'ok', texto: 'Nombre actualizado.' });
     } catch (e) {
+      // La cuenta ya se guardó (el saludo ya dice el nombre nuevo, así que el
+      // botón se deshabilita solo); lo que falló es sólo la copia dentro de
+      // los viajes ya existentes. No se pide "reintentar": con el nombre ya
+      // guardado, este mismo botón no tiene nada nuevo que enviar.
       setMensaje({
         tipo: 'error',
-        texto: e instanceof Error ? e.message : 'No se ha podido guardar el nombre.',
+        texto: `Se guardó el nombre, pero no llegó a tus viajes ya existentes (${
+          e instanceof Error ? e.message : 'fallo de red'
+        }). La clasificación de esos viajes seguirá enseñando el nombre anterior.`,
       });
     } finally {
       setGuardando(false);

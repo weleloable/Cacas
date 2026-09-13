@@ -3,7 +3,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { tema } from '@/lib/tema';
-import { ViajesProvider } from '@/lib/viajesContext';
 
 /** Icono de pestaña: un solo emoji, como el resto de la app (nada de librería
  * de iconos nueva, aquí todo se dice con emoji: 💩💧🍺🏆...). */
@@ -33,50 +32,51 @@ export default function LayoutPestanas() {
 
   if (!session) return <Redirect href="/login" />;
 
+  // El estado de los viajes (ViajesProvider) vive en el _layout.tsx raíz, no
+  // aquí: "unirme" es una ruta hermana de este grupo de pestañas, no una
+  // descendiente, y también necesita alcanzarlo.
   return (
-    <ViajesProvider>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: tema.acento,
-          tabBarInactiveTintColor: tema.textoTenue,
-          tabBarStyle: {
-            backgroundColor: tema.fondoElevado,
-            borderTopColor: tema.borde,
-            borderTopWidth: 1,
-          },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
-        }}>
-        <Tabs.Screen
-          name="viaje"
-          options={{
-            title: 'Mi Viaje',
-            tabBarIcon: ({ focused }) => <Icono simbolo="💧" activo={focused} />,
-          }}
-        />
-        <Tabs.Screen
-          name="mis-viajes"
-          options={{
-            title: 'Mis viajes',
-            tabBarIcon: ({ focused }) => <Icono simbolo="🧳" activo={focused} />,
-          }}
-        />
-        <Tabs.Screen
-          name="crear"
-          options={{
-            title: 'Crear viaje',
-            tabBarIcon: ({ focused }) => <Icono simbolo="✈️" activo={focused} />,
-          }}
-        />
-        <Tabs.Screen
-          name="perfil"
-          options={{
-            title: 'Perfil',
-            tabBarIcon: ({ focused }) => <Icono simbolo="👤" activo={focused} />,
-          }}
-        />
-      </Tabs>
-    </ViajesProvider>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: tema.acento,
+        tabBarInactiveTintColor: tema.textoTenue,
+        tabBarStyle: {
+          backgroundColor: tema.fondoElevado,
+          borderTopColor: tema.borde,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+      }}>
+      <Tabs.Screen
+        name="viaje"
+        options={{
+          title: 'Mi Viaje',
+          tabBarIcon: ({ focused }) => <Icono simbolo="💧" activo={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="mis-viajes"
+        options={{
+          title: 'Mis viajes',
+          tabBarIcon: ({ focused }) => <Icono simbolo="🧳" activo={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="crear"
+        options={{
+          title: 'Crear viaje',
+          tabBarIcon: ({ focused }) => <Icono simbolo="✈️" activo={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ focused }) => <Icono simbolo="👤" activo={focused} />,
+        }}
+      />
+    </Tabs>
   );
 }
 

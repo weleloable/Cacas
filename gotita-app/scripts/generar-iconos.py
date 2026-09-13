@@ -104,7 +104,13 @@ if __name__ == "__main__":
     imagenes = os.path.join(RAIZ, "assets", "images")
     gota_png(1024).save(f"{imagenes}/icon.png")
     gota_png(48).save(f"{imagenes}/favicon.png")
-    gota_png(512).save(f"{imagenes}/android-icon-foreground.png")
+
+    # Capa "foreground" del icono adaptativo de Android: NO va sobre
+    # transparente, va compuesta sobre android.adaptiveIcon.backgroundColor
+    # de app.json (#0B1020, el mismo azul-negro de la app). Un trazo negro
+    # sobre ese fondo da un contraste de ~1.1:1: invisible. Blanco sobre
+    # #0B1020 es lo que de verdad se va a ver en el launcher.
+    gota_png(512, color=BLANCO).save(f"{imagenes}/android-icon-foreground.png")
     # La capa "monochrome" de Android solo usa el canal alfa; el sistema la
     # tine con el color de acento del usuario, el color aqui es indiferente.
     gota_png(432).save(f"{imagenes}/android-icon-monochrome.png")

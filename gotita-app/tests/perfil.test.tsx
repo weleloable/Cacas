@@ -139,6 +139,27 @@ describe('Perfil', () => {
     expect(screen.getByText('email no verificado')).toBeTruthy();
   });
 
+  it('si falla sólo la propagación a los viajes, el mensaje deja claro que la cuenta SÍ se guardó', async () => {
+    // La cuenta puede tener éxito y el segundo paso fallar por separado (un
+    // corte de red justo entre medias). El mensaje de "no se ha podido
+    // guardar" sería mentira: el nombre de la cuenta ya cambió.
+    mockActualizarNombreEnMisViajes.mockRejectedValue(new Error('sin red'));
+    await act(async () => {
+      renderPantalla();
+    });
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByDisplayValue('Dudu'), 'Eduardo');
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText('Guardar cambios'));
+    });
+
+    expect(mockActualizarNombre).toHaveBeenCalledWith('Eduardo'); // sí se llamó, y con éxito
+    expect(screen.getByText(/Se guardó el nombre/)).toBeTruthy();
+    expect(screen.queryByText('Nombre actualizado.')).toBeNull();
+  });
+
   it('salir cierra sesión y manda al login', async () => {
     await act(async () => {
       renderPantalla();
