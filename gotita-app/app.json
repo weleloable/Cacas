@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Gotita",
+    "slug": "gotita-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "gotita",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B1020",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.weleloable.gotita"
+    },
+    "android": {
+      "package": "com.weleloable.gotita",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1020",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "themeColor": "#0B1020",
+      "backgroundColor": "#0B1020",
+      "display": "standalone",
+      "shortName": "Gotita",
+      "description": "Lo que pasa en el viaje, se cuenta."
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B1020",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true,
+      "baseUrl": "/Cacas"
+    }
+  }
+}

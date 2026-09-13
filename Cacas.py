@@ -311,13 +311,6 @@ with st.sidebar:
     st.divider()
     page = st.radio("Menú:", ["🏠 Inicio", "✈️ Crear Viaje", "📋 Unirme", "📊 Mi Viaje", "📈 Reportes"])
 
-    st.write(f"Estado de Session State: {'Lleno' if st.session_state.user else 'Vacío'}")
-    # Esto nos dirá si Supabase detecta algo en el navegador
-    try:
-        check_auth = supabase.auth.get_session()
-        st.write(f"Supabase detecta sesión: {'SÍ' if check_auth.session else 'NO'}")
-    except:
-        st.write("Error al consultar Supabase")
 if page == "🏠 Inicio":
     st.header(f"¡Hola, {USER_NAME.split()[0]}! ¡Bienvenido a Gotita!")
     st.write("""
