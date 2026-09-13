@@ -29,10 +29,13 @@ jest.mock('@/lib/viajes', () => ({
   cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
 }));
 
-const mockSesion = { valor: { user: { id: USUARIO } } };
+const mockSesion = { valor: { user: { id: USUARIO } } as { user: { id: string } } | null };
 
 jest.mock('@/lib/auth', () => ({
-  useAuth: () => ({ userId: USUARIO, session: mockSesion.valor }),
+  useAuth: () => ({
+    userId: mockSesion.valor?.user.id ?? '',
+    session: mockSesion.valor,
+  }),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -144,5 +147,27 @@ describe('ViajesProvider', () => {
     });
 
     expect(screen.getByTestId('error')).toHaveTextContent('sin red');
+  });
+
+  it('cerrar sesión vacía el estado, no lo deja colgado para el siguiente', async () => {
+    // El proveedor vive en el _layout.tsx raíz: a diferencia de vivir dentro
+    // de (tabs) (donde cerrar sesión lo desmontaría entero y lo limpiaría
+    // gratis), aquí sigue siendo la MISMA instancia tras el logout. Sin este
+    // vaciado explícito, en un móvil compartido entre varias personas del
+    // viaje, la siguiente en entrar vería un parpadeo con los viajes de la
+    // anterior.
+    await act(async () => {
+      render(arbol());
+    });
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('2');
+
+    mockSesion.valor = null; // logout
+    await act(async () => {
+      screen.rerender(arbol());
+    });
+
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('0');
+    expect(screen.getByTestId('activo')).toHaveTextContent('ninguno');
+    expect(mockCargarMisViajes).toHaveBeenCalledTimes(1); // no se pide nada sin userId
   });
 });

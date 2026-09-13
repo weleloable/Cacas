@@ -96,6 +96,12 @@ Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
   aquí la primera vez: unirse escribía en Supabase pero "Mi Viaje" seguía
   enseñando el viaje anterior hasta un pull-to-refresh, porque las pestañas
   no se remontan al navegar entre ellas.
+- Efecto secundario de vivir en la raíz: cerrar sesión ya NO desmonta el
+  proveedor (antes, viviendo dentro de `(tabs)`, sí lo hacía, y eso limpiaba
+  su estado gratis). El propio `ViajesProvider` vacía `viajes`/`error`
+  explícitamente en cuanto `userId` queda vacío — si no lo hiciera, en un
+  móvil compartido entre varias personas del viaje, quien entrase después
+  vería un parpadeo con los viajes de quien usó la app justo antes.
 - Perfil permite cambiar el nombre. Eso NO es sólo `auth.updateUser`: el
   nombre de cada viaje es una copia guardada en su JSON `usuarios` (ver
   "Decisiones tomadas"), así que `actualizarNombreEnMisViajes` (lib/viajes.ts)

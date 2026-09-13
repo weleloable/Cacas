@@ -41,8 +41,15 @@ const Contexto = createContext<ViajesContextoValor | null>(null);
  * que reflejarse en la otra sin depender de que ambas monten y recarguen por
  * su cuenta.
  *
- * Vive dentro de (tabs)/_layout.tsx, que ya garantiza que hay sesión antes de
- * montar esto — por eso no comprueba `session` aquí.
+ * Vive en el _layout.tsx RAÍZ, montado ya desde /login e /index: `recargar`
+ * no hace nada sin `userId`, así que existir antes de tener sesión es
+ * gratis. Eso sí importa aquí: al no vivir dentro de (tabs) (donde cerrar
+ * sesión desmontaría el proveedor entero y limpiaría su estado gratis), un
+ * logout no lo desmonta — sigue siendo la misma instancia, con el `viajes`
+ * del usuario anterior todavía en memoria, hasta que este efecto lo nota y
+ * lo vacía explícitamente. Sin ese vaciado, en un móvil compartido entre
+ * varias personas del viaje, quien entrase después vería un parpadeo con
+ * los viajes de quien usó la app justo antes.
  */
 export function ViajesProvider({ children }: { children: ReactNode }) {
   const { userId, session } = useAuth();
@@ -79,6 +86,16 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
   // false para cuando llega un refresco de fondo, así que no vuelve a
   // enseñar el spinner de carga completo.
   useEffect(() => {
+    if (!userId) {
+      // Sesión cerrada (o todavía no iniciada). No basta con no pedir nada:
+      // hay que soltar lo que hubiera de una sesión anterior, o se queda
+      // colgado en memoria para quien entre después en el mismo dispositivo.
+      setViajes([]);
+      setViajeActivoIdInterno(null);
+      setError(null);
+      setCargando(false);
+      return;
+    }
     recargar().finally(() => setCargando(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
