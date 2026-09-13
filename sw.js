@@ -26,8 +26,8 @@
 
 // Estas dos líneas las reescribe el build, buscándolas por su texto exacto.
 // Si no las encuentra, el build falla en vez de publicar un sw a medias.
-const VERSION = "af8c0a4b1406";
-const DEL_ARRANQUE = ["./","./manifest.json","./iconos/icono-192.png","./iconos/icono-512.png","./_expo/static/js/web/entry-af8c0a4b1406226adbfd2b4c345b90bc.js"];
+const VERSION = "ef7fa186bd34";
+const DEL_ARRANQUE = ["./","./manifest.json","./iconos/icono-192.png","./iconos/icono-512.png","./_expo/static/js/web/entry-ef7fa186bd34ad07311496c19535ebf8.js"];
 
 const CACHE = `gotita-${VERSION}`;
 
