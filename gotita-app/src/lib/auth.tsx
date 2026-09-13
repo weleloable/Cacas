@@ -27,6 +27,10 @@ type AuthContexto = {
   cargando: boolean;
   entrar: (email: string, password: string) => Promise<void>;
   registrar: (email: string, password: string, nombre: string) => Promise<void>;
+  /** Sólo cambia el nombre en la cuenta (`user_metadata.full_name`). No toca
+   * los viajes ya existentes: eso lo hace `actualizarNombreEnMisViajes` de
+   * `lib/viajes`, aparte, porque el nombre de cada viaje es una copia propia. */
+  actualizarNombre: (nombre: string) => Promise<void>;
   salir: () => Promise<void>;
 };
 
@@ -80,6 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Cuenta creada, pero hace falta confirmarla. Revisa tu email y luego entra.'
           );
         }
+      },
+      actualizarNombre: async (nombre) => {
+        const { error } = await supabase.auth.updateUser({ data: { full_name: nombre } });
+        if (error) throw error;
       },
       salir: async () => {
         await supabase.auth.signOut();

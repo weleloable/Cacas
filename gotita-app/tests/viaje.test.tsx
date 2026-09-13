@@ -72,7 +72,9 @@ jest.mock('expo-router', () => ({
 
 // Se importa después de los mocks, que es como jest los engancha.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const PantallaViaje = require('@/app/viaje').default;
+const PantallaViaje = require('@/app/(tabs)/viaje').default;
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ViajesProvider } = require('@/lib/viajesContext');
 
 // La pantalla usa useSafeAreaInsets, que sin proveedor revienta. En un test no
 // hay pantalla real de la que medir, así que se le dan métricas fijas.
@@ -86,7 +88,9 @@ const METRICAS: Metrics = {
 function arbol() {
   return (
     <SafeAreaProvider initialMetrics={METRICAS}>
-      <PantallaViaje />
+      <ViajesProvider>
+        <PantallaViaje />
+      </ViajesProvider>
     </SafeAreaProvider>
   );
 }

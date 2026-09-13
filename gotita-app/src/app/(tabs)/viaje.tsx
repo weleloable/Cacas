@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -17,23 +17,20 @@ import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
 import { radio, tema } from '@/lib/tema';
-import {
-  cargarMisViajes,
-  ConflictoDeConcurrencia,
-  modificarEvento,
-  totalDeUsuario,
-  type Viaje,
-} from '@/lib/viajes';
+import { ConflictoDeConcurrencia, modificarEvento, totalDeUsuario } from '@/lib/viajes';
+import { useViajes } from '@/lib/viajesContext';
 
+/**
+ * El viaje activo y sus contadores. Cambiar de viaje o gestionar la lista
+ * completa vive en la pestaña "Mis viajes"; esta pantalla siempre muestra
+ * el que esté marcado como activo en el contexto compartido.
+ */
 export default function PantallaViaje() {
-  const { session, userId, nombreUsuario, salir, cargando: cargandoSesion } = useAuth();
+  const { userId, nombreUsuario } = useAuth();
+  const { viaje, viajes, cargando, error, setError, recargar, setViajes } = useViajes();
   const insets = useSafeAreaInsets();
 
-  const [viajes, setViajes] = useState<Viaje[]>([]);
-  const [viajeActivoId, setViajeActivoId] = useState<number | null>(null);
-  const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   // Evento pendiente de confirmar al restar. null = no hay diálogo abierto.
   const [porRestar, setPorRestar] = useState<{ clave: string; cuenta: number } | null>(null);
 
@@ -50,44 +47,6 @@ export default function PantallaViaje() {
     setError(mensaje);
     scroll.current?.scrollTo({ y: 0, animated: true });
   }
-
-  const viaje = viajes.find((v) => v.id === viajeActivoId) ?? null;
-
-  /**
-   * Trae los viajes del servidor. `tocarError` es false cuando esto se llama
-   * para deshacer el pintado optimista tras un fallo de escritura: ese fallo
-   * ya dejó su propio mensaje con `mostrarError`, y esta recarga suele tener
-   * éxito (el problema estaba en la escritura, no en la lectura). Si tocara
-   * `error` aquí, su propio `setError(null)` de éxito borraría el aviso justo
-   * después de haberlo puesto, y el usuario nunca vería por qué no se restó.
-   */
-  const recargar = useCallback(
-    async (tocarError = true) => {
-      if (!userId) return;
-      try {
-        const mios = await cargarMisViajes(userId);
-        setViajes(mios);
-        setViajeActivoId((actual) =>
-          actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
-        );
-        if (tocarError) setError(null);
-      } catch (e) {
-        if (tocarError) {
-          setError(e instanceof Error ? e.message : 'No hemos podido cargar tus viajes.');
-        }
-      }
-    },
-    [userId]
-  );
-
-  useEffect(() => {
-    if (cargandoSesion) return;
-    if (!session) {
-      router.replace('/login');
-      return;
-    }
-    recargar().finally(() => setCargando(false));
-  }, [cargandoSesion, session, recargar]);
 
   function alPulsar(claveEvento: string, delta: number) {
     if (!viaje) return;
@@ -125,11 +84,12 @@ export default function PantallaViaje() {
   }
 
   /** El − no resta: abre el diálogo. Restar de verdad es `alConfirmarResta`. */
-  // Si el viaje activo cambia con el diálogo abierto, la resta caería en otro
-  // viaje. Se cierra y se vuelve a empezar.
+  // Si el viaje activo cambia con el diálogo abierto (p.ej. desde la pestaña
+  // "Mis viajes"), la resta caería en otro viaje. Se cierra y se empieza de
+  // nuevo.
   useEffect(() => {
     setPorRestar(null);
-  }, [viajeActivoId]);
+  }, [viaje?.id]);
 
   function alPedirResta(claveEvento: string, cuentaActual: number) {
     if (!sePuedeRestar(cuentaActual)) return;
@@ -203,7 +163,7 @@ export default function PantallaViaje() {
     setRefrescando(false);
   }
 
-  if (cargando || cargandoSesion) {
+  if (cargando) {
     return (
       <View style={estilos.centro}>
         <ActivityIndicator size="large" color={tema.acento} />
@@ -228,46 +188,21 @@ export default function PantallaViaje() {
         { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 48 },
       ]}
       refreshControl={
-        <RefreshControl
-          refreshing={refrescando}
-          onRefresh={alRefrescar}
-          tintColor={tema.acento}
-        />
+        <RefreshControl refreshing={refrescando} onRefresh={alRefrescar} tintColor={tema.acento} />
       }>
       <View style={estilos.cabecera}>
-        <View style={estilos.cabeceraTextos}>
-          <Text style={estilos.saludo}>💧 Hola, {nombreUsuario.split(' ')[0] || 'tú'}</Text>
-          {viaje ? <Text style={estilos.nombreViaje}>{viaje.nombre}</Text> : null}
-        </View>
-        <Pressable onPress={() => salir().then(() => router.replace('/login'))} hitSlop={10}>
-          <Text style={estilos.salir}>Salir</Text>
-        </Pressable>
+        <Text style={estilos.saludo}>💧 Hola, {nombreUsuario.split(' ')[0] || 'tú'}</Text>
+        {viaje ? <Text style={estilos.nombreViaje}>{viaje.nombre}</Text> : null}
       </View>
 
       {error ? <Text style={estilos.error}>{error}</Text> : null}
 
-      {viajes.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={estilos.selector}>
-          {viajes.map((v) => (
-            <Pressable
-              key={v.id}
-              onPress={() => setViajeActivoId(v.id)}
-              style={[estilos.chip, v.id === viajeActivoId && estilos.chipActivo]}>
-              <Text style={[estilos.chipTexto, v.id === viajeActivoId && estilos.chipTextoActivo]}>
-                {v.nombre}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
-
       {!viaje ? (
         <View style={estilos.vacio}>
           <Text style={estilos.vacioEmoji}>🧳</Text>
-          <Text style={estilos.vacioTitulo}>No estás en ningún viaje activo</Text>
+          <Text style={estilos.vacioTitulo}>
+            {viajes.length > 0 ? 'Elige un viaje en "Mis viajes"' : 'No estás en ningún viaje'}
+          </Text>
           <Text style={estilos.vacioTexto}>
             Crea uno nuevo, o pide el código a quien lo haya creado y únete.
           </Text>
@@ -330,10 +265,7 @@ export default function PantallaViaje() {
               <View key={fila.clave} style={estilos.filaRanking}>
                 <Text style={estilos.puesto}>{indice + 1}</Text>
                 <Text
-                  style={[
-                    estilos.nombreRanking,
-                    fila.clave === userId && estilos.nombreRankingYo,
-                  ]}
+                  style={[estilos.nombreRanking, fila.clave === userId && estilos.nombreRankingYo]}
                   numberOfLines={1}>
                   {fila.nombre}
                 </Text>
@@ -344,15 +276,6 @@ export default function PantallaViaje() {
 
           <View style={estilos.pie}>
             <Text style={estilos.codigo}>Código del viaje: {viaje.codigo}</Text>
-            <View style={estilos.pieEnlaces}>
-              <Pressable onPress={() => router.push('/crear')} hitSlop={10}>
-                <Text style={estilos.enlace}>Crear otro</Text>
-              </Pressable>
-              <Text style={estilos.separador}>·</Text>
-              <Pressable onPress={() => router.push('/unirme')} hitSlop={10}>
-                <Text style={estilos.enlace}>Unirme a otro</Text>
-              </Pressable>
-            </View>
           </View>
         </>
       )}
@@ -374,11 +297,9 @@ const estilos = StyleSheet.create({
   contenido: { paddingHorizontal: 18 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.fondo },
 
-  cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  cabeceraTextos: { flex: 1 },
+  cabecera: { gap: 2 },
   saludo: { color: tema.textoTenue, fontSize: 15, fontWeight: '600' },
   nombreViaje: { color: tema.texto, fontSize: 28, fontWeight: '800', marginTop: 2 },
-  salir: { color: tema.textoTenue, fontSize: 15, fontWeight: '600', paddingTop: 2 },
 
   error: {
     color: tema.peligro,
@@ -388,19 +309,6 @@ const estilos = StyleSheet.create({
     marginTop: 16,
     fontSize: 14,
   },
-
-  selector: { gap: 8, paddingVertical: 16 },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: tema.tarjeta,
-    borderWidth: 1,
-    borderColor: tema.borde,
-  },
-  chipActivo: { backgroundColor: tema.acento, borderColor: tema.acento },
-  chipTexto: { color: tema.textoTenue, fontWeight: '700', fontSize: 14 },
-  chipTextoActivo: { color: '#04121C' },
 
   seccion: { marginTop: 28 },
   tituloSeccion: {
@@ -493,8 +401,5 @@ const estilos = StyleSheet.create({
   enlaceVacio: { color: tema.acento, fontSize: 15, fontWeight: '700', marginTop: 22 },
 
   pie: { marginTop: 36, alignItems: 'center', gap: 12 },
-  pieEnlaces: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   codigo: { color: tema.textoTenue, fontSize: 14, letterSpacing: 0.5 },
-  enlace: { color: tema.acento, fontSize: 15, fontWeight: '700' },
-  separador: { color: tema.textoTenue, fontSize: 15 },
 });

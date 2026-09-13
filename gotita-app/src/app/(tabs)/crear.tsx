@@ -17,9 +17,11 @@ import { useAuth } from '@/lib/auth';
 import { CATEGORIAS } from '@/lib/categorias';
 import { radio, tema } from '@/lib/tema';
 import { crearViaje, type Viaje } from '@/lib/viajes';
+import { useViajes } from '@/lib/viajesContext';
 
 export default function Crear() {
   const { userId, nombreUsuario } = useAuth();
+  const { setViajes, setViajeActivoId } = useViajes();
 
   const [nombre, setNombre] = useState('');
   const [seleccionadas, setSeleccionadas] = useState<string[]>(Object.keys(CATEGORIAS));
@@ -51,6 +53,12 @@ export default function Crear() {
     try {
       const viaje = await crearViaje(nombre.trim(), seleccionadas, userId, nombreUsuario);
       setCreado(viaje);
+      // Se añade directo al contexto compartido y se marca activo, sin
+      // esperar a un recargar(): así "Mi Viaje" ya lo tiene en cuanto se
+      // navegue ahí, sin depender de que la escritura ya se vea en una
+      // lectura posterior.
+      setViajes((previos) => [viaje, ...previos]);
+      setViajeActivoId(viaje.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No hemos podido crear el viaje.');
     } finally {

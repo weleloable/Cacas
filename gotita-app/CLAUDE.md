@@ -62,6 +62,49 @@ Piezas de la PWA:
   dentro son Safari, Apple obliga a WebKit, pero sin su menú de compartir) se
   avisa de que hace falta abrir con Safari.
 
+## Navegación
+
+Cuatro pestañas abajo (expo-router `Tabs`), sólo con sesión: Mi Viaje 💧,
+Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
+
+- `src/app/(tabs)/_layout.tsx` — un único guard de sesión para las cuatro
+  (antes cada pantalla comprobaba `session` por su cuenta). Sin sesión,
+  `<Redirect href="/login" />`; con sesión, envuelve todo en
+  `<ViajesProvider>`.
+- `src/lib/viajesContext.tsx` — qué viajes hay y cuál es el activo,
+  compartido entre "Mi Viaje" y "Mis viajes": elegir un viaje en una pestaña
+  tiene que verse en la otra sin pedirlo otra vez a Supabase. Reproduce el
+  efecto que antes tenía `viaje.tsx`: recarga al montar Y cada vez que
+  cambia la identidad de `session` (Supabase dispara `TOKEN_REFRESHED` al
+  volver a la pestaña).
+- Los ficheros de ruta se llaman `viaje.tsx` y `crear.tsx` (no `mi-viaje.tsx`
+  ni `crear-viaje.tsx`) a propósito: son los nombres de antes de haber
+  pestañas, y varios `router.replace('/viaje')` / `router.push('/crear')`
+  siguen intactos porque la ruta no cambió, sólo el título de la pestaña
+  (`options={{ title: 'Mi Viaje' }}`). `(tabs)` es un grupo de rutas de
+  expo-router: no aparece en la URL.
+- `unirme.tsx` se queda FUERA de las pestañas (ruta suelta, empujada con
+  `router.push('/unirme')` desde "Mis viajes" y desde el estado vacío de "Mi
+  Viaje"): es una acción puntual, no un sitio en el que uno "vive".
+- Perfil permite cambiar el nombre. Eso NO es sólo `auth.updateUser`: el
+  nombre de cada viaje es una copia guardada en su JSON `usuarios` (ver
+  "Decisiones tomadas"), así que `actualizarNombreEnMisViajes` (lib/viajes.ts)
+  recorre los viajes activos del usuario y actualiza esa copia en cada uno,
+  con `Promise.allSettled` — si un viaje falla al escribir no debe tapar que
+  la cuenta y el resto de viajes sí se actualizaron. Los viajes ya
+  finalizados no se tocan (se quedan con el nombre que tenían, como registro
+  histórico).
+
+## Icono
+
+Gota dibujada por vector en `scripts/generar-iconos.py` (no un emoji, no una
+imagen de origen): silueta hueca, trazo negro de grosor medio, fondo y
+relleno transparentes. Cada tamaño se genera de cero con su propio grosor
+proporcional — redimensionar un único master deja un trazo fino borroso o
+dentado. El `apple-touch-icon` es la única excepción: va sobre fondo blanco
+porque iOS no respeta el canal alfa (pinta el hueco de negro). Para
+regenerarlo tras tocar la geometría: `npm run iconos`.
+
 ## Confirmación al restar
 
 - Restar pide confirmación, sumar no. Borrar tiene que costar más que añadir.
@@ -108,6 +151,13 @@ Piezas de la PWA:
   por lista exacta) e inyección en el HTML contra el fixture del build real.
 - `instalacion.test.ts` — detección de iOS (incluido el iPad moderno, que se
   hace pasar por Mac) y de Safari frente a Chrome/Firefox para iOS.
+- `viajesContext.test.tsx` — el estado compartido: cambiar el activo se ve
+  sin recargar, un refresco de sesión sí recarga, `recargar(false)` no toca
+  `error`.
+- `mis-viajes.test.tsx`, `perfil.test.tsx` — las pantallas nuevas, montadas
+  con el `ViajesProvider` real (no una versión de mentira del contexto).
+- `viajes.test.ts` — `modificarEvento` y `actualizarNombreEnMisViajes`
+  ejecutando la implementación real, mockeando sólo `supabase`.
 
 ## Nota para quien edite este fichero con un script
 

@@ -125,6 +125,38 @@ export async function unirseAViaje(
 }
 
 /**
+ * Propaga un cambio de nombre a los viajes activos del usuario.
+ *
+ * El nombre para mostrar es una copia dentro del JSON `usuarios` de cada
+ * viaje (ver el comentario de `UsuarioViaje.nombre`): cambiarlo sólo en la
+ * cuenta (`auth.updateUser`) no actualiza la clasificación de los viajes en
+ * los que ya está metido. Se limita a los viajes ACTIVOS porque
+ * `cargarMisViajes` sólo trae esos; los finalizados se quedan con el nombre
+ * que tenían en su momento, que es razonable como registro histórico.
+ */
+export async function actualizarNombreEnMisViajes(
+  userId: string,
+  nuevoNombre: string
+): Promise<void> {
+  const mios = await cargarMisViajes(userId);
+  // allSettled, no all: esto se llama después de que el nombre de la CUENTA
+  // ya se ha guardado con éxito. Si un solo viaje fallase al escribir con
+  // Promise.all, el error de esa fila taparía que la cuenta y el resto de
+  // viajes sí se actualizaron, y el usuario vería "no se ha podido guardar"
+  // con el nombre ya cambiado por debajo. Los viajes que no se actualicen se
+  // quedan con el nombre viejo hasta el próximo intento; no es peor que el
+  // estado antes de llamar a esto.
+  await Promise.allSettled(
+    mios.map((v) => {
+      const usuario = v.usuarios?.[userId];
+      if (!usuario || usuario.nombre === nuevoNombre) return Promise.resolve();
+      const usuarios = { ...v.usuarios, [userId]: { ...usuario, nombre: nuevoNombre } };
+      return supabase.from('viajes').update({ usuarios }).eq('id', v.id);
+    })
+  );
+}
+
+/**
  * Suma o resta 1 a un contador y guarda.
  *
  * A diferencia de registrar_evento() en Cacas.py, esto lee y escribe UNA fila,
