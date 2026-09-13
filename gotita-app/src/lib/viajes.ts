@@ -133,11 +133,34 @@ export async function unirseAViaje(
  * pisarse; la solución definitiva es una función RPC en Postgres con
  * jsonb_set, pendiente para más adelante.
  */
+/**
+ * Se lanza cuando quien pide restar tenía en pantalla un número que ya no es
+ * el del servidor. Pasa de verdad: dos móviles en el mismo viaje, o el mismo
+ * móvil con una pestaña vieja de fondo. Comparar contra el estado local del
+ * cliente no lo detecta, porque el cliente puede llevar el mismo retraso que
+ * el diálogo; sólo lo detecta comparar contra lo que el servidor tiene en el
+ * momento de escribir.
+ */
+export class ConflictoDeConcurrencia extends Error {
+  constructor(public valorEnServidor: number) {
+    super(`La cuenta en el servidor es ${valorEnServidor}, no la que se esperaba.`);
+    this.name = 'ConflictoDeConcurrencia';
+  }
+}
+
 export async function modificarEvento(
   viajeId: number,
   userId: string,
   claveEvento: string,
-  delta: number
+  delta: number,
+  /**
+   * Si se pasa, la escritura se rechaza cuando el valor en el servidor no es
+   * exactamente este, en vez de aplicar el delta a ciegas sobre lo que haya.
+   * Lo usa la confirmación al restar: sin esto, el diálogo puede prometer
+   * "de 3 a 2" y el resultado real ser 4, porque otro dispositivo sumó entre
+   * medias y el delta se aplicaría igual sobre el 5 real del servidor.
+   */
+  valorEsperado?: number
 ): Promise<Viaje> {
   const viaje = await cargarUnViaje(viajeId);
   if (!viaje) throw new Error('El viaje ya no existe');
@@ -146,6 +169,9 @@ export async function modificarEvento(
   if (!usuarioActual) throw new Error('No estás apuntado a este viaje');
 
   const valorActual = usuarioActual.eventos?.[claveEvento] ?? 0;
+  if (valorEsperado !== undefined && valorActual !== valorEsperado) {
+    throw new ConflictoDeConcurrencia(valorActual);
+  }
   const nuevoValor = Math.max(0, valorActual + delta);
 
   const usuarios = {

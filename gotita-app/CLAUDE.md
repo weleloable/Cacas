@@ -1,1 +1,117 @@
 @AGENTS.md
+
+## Comandos
+
+```bash
+npx expo start --web --host lan --port 8082   # dev, accesible desde el móvil
+npx tsc --noEmit                              # chequeo de tipos
+npm test                                      # gate tests (jest-expo), 77 en total
+npm run build:web                             # build a dist/ + inyección PWA
+npm run desplegar                             # build + publicar en gh-pages
+npm run iconos                                # regenera public/iconos (necesita Pillow)
+```
+
+## Web y PWA
+
+Se sirve en https://weleloable.github.io/Cacas/ desde la rama `gh-pages`.
+`experiments.baseUrl` es `/Cacas`, así que todo cuelga de ahí.
+
+Expo SDK 57 no genera manifest PWA y, con `web.output: "single"`, **ignora
+`src/app/+html.tsx`** (comprobado: el HTML sale igual con él que sin él). Por
+eso el `<head>` se completa después del export, en `scripts/preparar-web.js`,
+que además escribe `404.html` (para que GitHub Pages no rompa las rutas de la
+SPA) y `.nojekyll`. El script **falla el build** si alguna de sus
+sustituciones de texto no encaja contra lo que Expo generó — mejor que
+publicar en silencio una web que ya no se puede instalar. El HTML crudo de
+referencia está capturado en `tests/fixtures/expo-index.html`; al actualizar
+Expo hay que recapturarlo (`npx expo export --platform web` y copiar el
+`dist/index.html` de antes de correr `preparar-web.js`).
+
+Piezas de la PWA:
+
+- `public/manifest.json` — Expo copia `public/` a la raíz de `dist/`.
+  **`id` es `/Cacas/`, absoluto, y NUNCA debe cambiarse ni hacerse relativo.**
+  El spec resuelve `id` contra el *origin* del documento, no contra la carpeta
+  del manifest ni contra `start_url`: `new URL(id, origin)`. Un `id` relativo
+  como `"./"` resolvería a `https://weleloable.github.io/` — la raíz de TODO
+  el dominio de GitHub Pages del usuario, no sólo `/Cacas/` — y cambiar su
+  valor resuelto hace que Chrome dé de alta una instalación nueva en vez de
+  actualizar la existente (icono duplicado para quien ya la tuviera
+  instalada). `start_url` y `scope` sí son relativos (`"./"`), y esos dos no
+  tienen este problema.
+- `public/sw.js` — service worker. Existe porque Chrome no ofrece instalar sin
+  uno que tenga manejador de `fetch`. Red primero en navegaciones, caché
+  primero en `/_expo/static/` e `/iconos/` (llevan hash), nada de otro origen
+  se toca (Supabase jamás sale de caché). `VERSION` y `DEL_ARRANQUE` los
+  reescribe el build con el hash del bundle: nada que subir a mano, y la
+  caché vieja se borra sola en cada despliegue. El bundle va precargado, así
+  que offline funciona **a partir de la segunda visita** — la primera
+  necesita red, porque el registro del service worker ocurre en el evento
+  `load`, después de que el bundle ya se haya bajado sin pasar por él.
+- `public/iconos/` — generados por `scripts/generar-iconos.py` desde
+  `assets/images/icon.png`. 192/512 normales y maskable, más
+  `apple-touch-icon` de 180.
+- `src/componentes/AvisoInstalar.tsx` — en Android abre el diálogo nativo de
+  Chrome; en iOS explica dónde está "Añadir a pantalla de inicio" (Safari no
+  tiene diálogo). El evento `beforeinstallprompt` lo captura un script en el
+  `<head>` (inyectado por `preparar-web.js`), **no** un `useEffect` de React:
+  Chrome lo dispara una sola vez por carga, normalmente antes de que la app
+  monte nada, y este componente sólo vive dentro de la pantalla de viaje —
+  si el usuario arranca en `/login`, un listener puesto ahí llegaría tarde y
+  el aviso no aparecería nunca en esa carga. En Chrome/Firefox de iOS (que por
+  dentro son Safari, Apple obliga a WebKit, pero sin su menú de compartir) se
+  avisa de que hace falta abrir con Safari.
+
+## Confirmación al restar
+
+- Restar pide confirmación, sumar no. Borrar tiene que costar más que añadir.
+  El diálogo es propio (`src/componentes/DialogoConfirmar.tsx`) porque
+  `Alert.alert` de react-native no hace nada en web.
+- Confirmar ignora pulsaciones durante `MS_DE_ARMADO` (350ms) al abrirse.
+  react-native-web monta el modal clicable a pantalla completa desde el primer
+  frame mientras se funde 250ms (`animatedIn` no lleva `pointerEvents: 'none'`,
+  `animatedOut` sí). Sin esa ventana, el segundo toque de un doble toque en −
+  cae sobre "Sí, quitar" invisible y resta sin que se vea nada. **Cancelar no
+  lleva esa espera**: cancelar pronto nunca destruye nada, y gatearlo también
+  producía un dimado de "pulsado" que no hacía nada durante 350ms — una
+  confirmación visual falsa.
+- La revalidación al confirmar es contra el **servidor**, no contra el estado
+  local: `modificarEvento(..., valorEsperado)` relee la fila justo antes de
+  escribir y lanza `ConflictoDeConcurrencia` si el valor real no es el que el
+  diálogo prometió. Comparar sólo contra `viaje` (estado local) no basta,
+  porque el cliente puede llevar el mismo retraso que el diálogo: el caso real
+  es que OTRO dispositivo haya sumado entre medias, y el cliente local no se
+  entera de eso salvo que recargue.
+- El aviso de conflicto sube el scroll al principio (`mostrarError` en
+  `viaje.tsx`), porque el botón − suele estar lejos de la cabecera. La
+  recarga que deshace el pintado optimista tras un fallo (`recargar(false)`)
+  no toca `error`: si lo tocara, su propio `setError(null)` de éxito borraría
+  el aviso justo después de haberlo puesto.
+- El botón atrás de Android **no** cancela el diálogo en el build web:
+  `onRequestClose` sólo se dispara con Escape en react-native-web.
+
+## Tests
+
+`npm test`. Jest con el preset `jest-expo`, tests en `tests/`. Sin red: el
+`fetch` global revienta a propósito en `tests/preparar.ts`.
+
+- `viaje.test.tsx` — la pantalla de verdad: que el − no resta, que confirmar
+  sí, que un toque temprano no confirma, que un conflicto de servidor no
+  escribe y avisa.
+- `DialogoConfirmar.test.tsx` — el diálogo aislado: ventana de armado,
+  cancelar inmediato, fondo, Escape.
+- `sw.test.ts` — ejecuta `public/sw.js` en un contexto aislado con `caches` y
+  `fetch` falsos. Comportamiento, no grep sobre el fuente. Incluye una prueba
+  de que el guardia de origen protege de verdad (con una URL de otro origen
+  que imita las rutas cacheables, para que no pase por casualidad).
+- `pwa.test.ts` — manifest, iconos (mide los PNG de verdad, por criterio no
+  por lista exacta) e inyección en el HTML contra el fixture del build real.
+- `instalacion.test.ts` — detección de iOS (incluido el iPad moderno, que se
+  hace pasar por Mac) y de Safari frente a Chrome/Firefox para iOS.
+
+## Nota para quien edite este fichero con un script
+
+Un `str.replace()` sobre un fichero leído con `io.open()` no falla si el texto
+buscado no existe: simplemente no hace nada, y el fichero se reescribe igual.
+Verificar después con `git diff` o releyendo el resultado, no dar por hecho
+que un script sin errores hizo el cambio.

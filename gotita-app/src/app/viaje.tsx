@@ -17,7 +17,13 @@ import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
 import { radio, tema } from '@/lib/tema';
-import { cargarMisViajes, modificarEvento, totalDeUsuario, type Viaje } from '@/lib/viajes';
+import {
+  cargarMisViajes,
+  ConflictoDeConcurrencia,
+  modificarEvento,
+  totalDeUsuario,
+  type Viaje,
+} from '@/lib/viajes';
 
 export default function PantallaViaje() {
   const { session, userId, nombreUsuario, salir, cargando: cargandoSesion } = useAuth();
@@ -34,22 +40,45 @@ export default function PantallaViaje() {
   // Las escrituras van en fila india: si pulsas 💩 cinco veces seguidas, cada
   // guardado espera al anterior en vez de leer todos la misma cuenta vieja.
   const cola = useRef<Promise<unknown>>(Promise.resolve());
+  const scroll = useRef<ScrollView>(null);
+
+  /** Sube al principio, que es donde vive el aviso de error. Sin esto, un
+   * error al confirmar una resta (el − suele estar lejos del principio, al
+   * final de una lista larga de categorías) no lo ve nadie: el diálogo se
+   * cierra, no cambia ningún número visible, y parece que no ha pasado nada. */
+  function mostrarError(mensaje: string) {
+    setError(mensaje);
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  }
 
   const viaje = viajes.find((v) => v.id === viajeActivoId) ?? null;
 
-  const recargar = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const mios = await cargarMisViajes(userId);
-      setViajes(mios);
-      setViajeActivoId((actual) =>
-        actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
-      );
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No hemos podido cargar tus viajes.');
-    }
-  }, [userId]);
+  /**
+   * Trae los viajes del servidor. `tocarError` es false cuando esto se llama
+   * para deshacer el pintado optimista tras un fallo de escritura: ese fallo
+   * ya dejó su propio mensaje con `mostrarError`, y esta recarga suele tener
+   * éxito (el problema estaba en la escritura, no en la lectura). Si tocara
+   * `error` aquí, su propio `setError(null)` de éxito borraría el aviso justo
+   * después de haberlo puesto, y el usuario nunca vería por qué no se restó.
+   */
+  const recargar = useCallback(
+    async (tocarError = true) => {
+      if (!userId) return;
+      try {
+        const mios = await cargarMisViajes(userId);
+        setViajes(mios);
+        setViajeActivoId((actual) =>
+          actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
+        );
+        if (tocarError) setError(null);
+      } catch (e) {
+        if (tocarError) {
+          setError(e instanceof Error ? e.message : 'No hemos podido cargar tus viajes.');
+        }
+      }
+    },
+    [userId]
+  );
 
   useEffect(() => {
     if (cargandoSesion) return;
@@ -88,8 +117,8 @@ export default function PantallaViaje() {
         setViajes((previos) => previos.map((v) => (v.id === viajeId ? actualizado : v)));
         setError(null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se ha podido guardar.');
-        await recargar(); // Deshace lo pintado volviendo a lo que dice el servidor.
+        mostrarError(e instanceof Error ? e.message : 'No se ha podido guardar.');
+        await recargar(false); // Deshace lo pintado volviendo a lo que dice el servidor.
       }
     };
     cola.current = cola.current.then(guardar, guardar);
@@ -108,26 +137,64 @@ export default function PantallaViaje() {
   }
 
   /**
-   * Confirmar no aplica a ciegas lo que decía el diálogo.
+   * Confirmar no aplica el delta a ciegas.
    *
-   * Entre abrirlo y confirmarlo puede haber entrado un `recargar()`: Supabase
-   * dispara TOKEN_REFRESHED al volver a la pestaña, eso cambia la identidad de
-   * `session` y el efecto de arriba recarga. Si la cuenta ya no es la que se
-   * enseñó, el texto del diálogo miente, así que no se resta y se dice por qué.
+   * No basta con comparar contra `viaje` (el estado local del cliente):
+   * el escenario real que esto protege es que OTRO dispositivo haya sumado
+   * entre que se abrió el diálogo y se confirmó, y el cliente local puede
+   * llevar el mismo retraso que el diálogo. `modificarEvento` recibe el valor
+   * que el diálogo prometió y lo comprueba contra lo que el servidor tenga en
+   * el instante de escribir, no contra lo que hay pintado en pantalla.
    */
   function alConfirmarResta() {
     if (!porRestar) return;
-    const cuentaAhora = viaje?.usuarios?.[userId]?.eventos?.[porRestar.clave] ?? 0;
-    setPorRestar(null);
-
-    if (cuentaAhora !== porRestar.cuenta) {
-      setError(
-        `La cuenta cambió mientras confirmabas (ahora hay ${cuentaAhora}). No se ha quitado nada, vuelve a intentarlo.`
-      );
+    const { clave, cuenta } = porRestar;
+    if (!viaje) {
+      setPorRestar(null);
       return;
     }
-    if (!sePuedeRestar(cuentaAhora)) return;
-    alPulsar(porRestar.clave, -1);
+    const viajeId = viaje.id;
+    setPorRestar(null);
+
+    // Optimista igual que alPulsar, pero desde el valor prometido por el
+    // diálogo: si el cliente ya iba desfasado, esto puede pintar un número
+    // que la respuesta del servidor corrija enseguida, en vez de aplicar el
+    // delta sobre lo que haya en pantalla en ese instante.
+    setViajes((previos) =>
+      previos.map((v) => {
+        if (v.id !== viajeId) return v;
+        const usuario = v.usuarios[userId];
+        if (!usuario) return v;
+        return {
+          ...v,
+          usuarios: {
+            ...v.usuarios,
+            [userId]: {
+              ...usuario,
+              eventos: { ...usuario.eventos, [clave]: Math.max(0, cuenta - 1) },
+            },
+          },
+        };
+      })
+    );
+
+    const guardar = async () => {
+      try {
+        const actualizado = await modificarEvento(viajeId, userId, clave, -1, cuenta);
+        setViajes((previos) => previos.map((v) => (v.id === viajeId ? actualizado : v)));
+        setError(null);
+      } catch (e) {
+        if (e instanceof ConflictoDeConcurrencia) {
+          mostrarError(
+            `La cuenta cambió mientras confirmabas: ahora hay ${e.valorEnServidor}, no ${cuenta}. No se ha quitado nada, vuelve a intentarlo.`
+          );
+        } else {
+          mostrarError(e instanceof Error ? e.message : 'No se ha podido guardar.');
+        }
+        await recargar(false); // Deshace lo pintado volviendo a lo que dice el servidor.
+      }
+    };
+    cola.current = cola.current.then(guardar, guardar);
   }
 
   async function alRefrescar() {
@@ -153,6 +220,7 @@ export default function PantallaViaje() {
 
   return (
     <ScrollView
+      ref={scroll}
       testID="scroll-viaje"
       style={estilos.pantalla}
       contentContainerStyle={[

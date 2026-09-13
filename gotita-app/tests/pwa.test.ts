@@ -50,13 +50,28 @@ describe('manifest.json', () => {
     expect(manifest.prefer_related_applications).toBeFalsy();
   });
 
-  it('start_url, scope e id son relativos, para no romperse si cambia el baseUrl', () => {
+  it('start_url y scope son relativos, para no romperse si cambia el baseUrl', () => {
     // Están servidos desde /Cacas/. Absolutos habría que tocarlos a mano el día
-    // que la app se mueva de sitio, y nadie se acordaría. El `id` cuenta: es la
-    // identidad de la instalación.
+    // que la app se mueva de sitio, y nadie se acordaría.
     expect(manifest.start_url).toBe('./');
     expect(manifest.scope).toBe('./');
-    expect(manifest.id).toBe('./');
+  });
+
+  it('id es absoluto a propósito: NUNCA debe cambiar de valor', () => {
+    // Contraintuitivo y por eso este test existe. El spec resuelve `id` contra
+    // el ORIGEN del documento, no contra la carpeta del manifest ni contra
+    // start_url: new URL(id, origin). "./" resolvería a
+    // "https://weleloable.github.io/", que es la RAÍZ DE TODO EL SITIO
+    // weleloable.github.io, no "/Cacas/". Con ese valor, la instalación de
+    // Gotita reclamaría el origin entero y cualquier futura PWA del mismo
+    // usuario en ese dominio colisionaría con ella.
+    //
+    // Además, `id` es la identidad de la instalación: cambiar su valor
+    // resuelto hace que Chrome dé de alta una instalación NUEVA en vez de
+    // actualizar la existente, duplicando el icono en el escritorio de quien
+    // ya la tuviera instalada. Por eso va fijo a la ruta completa y no debe
+    // tocarse aunque start_url y scope sean relativos.
+    expect(manifest.id).toBe('/Cacas/');
   });
 
   it('los colores coinciden con el tema de la app, para que no pegue un fogonazo al abrir', () => {

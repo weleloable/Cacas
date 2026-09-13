@@ -217,6 +217,26 @@ describe('service worker, ejecutado', () => {
     expect(entorno.caches.size).toBe(0);
   });
 
+  it('el guardia de origen protege de verdad, no por casualidad de la ruta', async () => {
+    // El test de arriba pasaría igual si el guardia `url.origin !== self.location.origin`
+    // se quitara del todo, porque la URL de Supabase no contiene "/_expo/static/"
+    // ni "/iconos/" y por tanto nunca entraría en cachePrimero de todos modos.
+    // Este usa una URL de OTRO origen que sí imita esas rutas, para que sólo
+    // pase si el guardia de origen está haciendo su trabajo.
+    montarSw(SW_DE_BUILD());
+
+    const r = await disparar('fetch', {
+      request: {
+        url: 'https://otro-origen-cualquiera.example/_expo/static/js/web/entry-abc.js',
+        method: 'GET',
+        mode: 'cors',
+      },
+    });
+
+    expect(r).toBeNull();
+    expect(entorno.caches.size).toBe(0);
+  });
+
   it('tampoco intercepta escrituras del mismo origen', async () => {
     montarSw(SW_DE_BUILD());
     const r = await disparar('fetch', {

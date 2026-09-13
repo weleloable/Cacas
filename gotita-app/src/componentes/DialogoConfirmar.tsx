@@ -32,10 +32,15 @@ type Props = {
  * react-native-web `Alert.alert` no hace nada, y la web es la forma en que se
  * usa esta app desde el móvil.
  *
- * Cancelar es lo fácil: es el botón ancho, está donde cae el pulgar y también
- * se cancela tocando fuera o con Escape. Confirmar es estrecho, está en el
- * lado contrario al del botón − para que un toque de más no lo encuentre, y
- * no acepta pulsaciones hasta pasados `MS_DE_ARMADO`.
+ * Cancelar es lo fácil: es el botón ancho, está donde cae el pulgar, funciona
+ * desde el primer instante y también cancela tocando fuera o con Escape.
+ * Cancelar pronto nunca es un problema (no destruye nada), así que no lleva
+ * la espera de armado.
+ *
+ * Confirmar es estrecho, está en el lado contrario al del botón − para que un
+ * toque de más no lo encuentre, y no acepta pulsaciones hasta pasados
+ * `MS_DE_ARMADO` **desde que se suelta el dedo, no desde que se apoya**: es
+ * `onPress`, que en react-native-web dispara al soltar.
  *
  * Ojo: `onRequestClose` sólo se dispara con Escape en react-native-web. El
  * botón atrás de Android NO cancela en el build web, que es el único que se
@@ -58,9 +63,6 @@ export function DialogoConfirmar({ visible, textos, alConfirmar, alCancelar }: P
     };
   }, [abierto]);
 
-  // Mientras no está armado no responde a nada, ni siquiera a cancelar: un
-  // cierre invisible dejaría al usuario creyendo que su toque se perdió.
-  const cancelar = () => armado && alCancelar();
   const confirmar = () => armado && alConfirmar();
 
   return (
@@ -69,10 +71,10 @@ export function DialogoConfirmar({ visible, textos, alConfirmar, alCancelar }: P
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={cancelar}>
+      onRequestClose={alCancelar}>
       <Pressable
         style={estilos.fondo}
-        onPress={cancelar}
+        onPress={alCancelar}
         accessibilityLabel="Cerrar sin quitar nada">
         {/* Un Pressable sin onPress se come el toque, para que tocar dentro
             del cuadro no cuente como tocar fuera y lo cierre. */}
@@ -101,7 +103,7 @@ export function DialogoConfirmar({ visible, textos, alConfirmar, alCancelar }: P
               <Text style={estilos.textoConfirmar}>{textos?.etiquetaConfirmar}</Text>
             </Pressable>
             <Pressable
-              onPress={cancelar}
+              onPress={alCancelar}
               accessibilityRole="button"
               accessibilityLabel={textos?.etiquetaCancelar}
               style={({ pressed }) => [

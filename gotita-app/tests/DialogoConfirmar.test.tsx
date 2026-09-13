@@ -93,29 +93,46 @@ describe('DialogoConfirmar', () => {
     expect(alConfirmar).not.toHaveBeenCalled();
   });
 
+  it('cancelar funciona de inmediato, sin esperar a la ventana de armado', async () => {
+    // Cancelar pronto nunca destruye nada, así que no lleva la espera de
+    // confirmar. Gatearlo también dejaba el botón dimándose al pulsarlo sin
+    // hacer nada durante 350ms: una confirmación visual falsa.
+    const alConfirmar = jest.fn();
+    const alCancelar = jest.fn();
+    await render(
+      <DialogoConfirmar visible textos={textos} alConfirmar={alConfirmar} alCancelar={alCancelar} />
+    );
+
+    await pulsar(screen.getByText('Cancelar'));
+    expect(alCancelar).toHaveBeenCalledTimes(1);
+    expect(alConfirmar).not.toHaveBeenCalled();
+  });
+
+  it('tocar el fondo también cancela de inmediato', async () => {
+    const alCancelar = jest.fn();
+    await render(
+      <DialogoConfirmar visible textos={textos} alConfirmar={jest.fn()} alCancelar={alCancelar} />
+    );
+
+    await pulsar(screen.getByLabelText('Cerrar sin quitar nada'));
+    expect(alCancelar).toHaveBeenCalledTimes(1);
+  });
+
   describe('ventana de armado', () => {
     // react-native-web monta el modal a pantalla completa y clicable desde el
     // primer frame mientras se funde durante 250ms: animatedOut lleva
     // pointerEvents 'none' y animatedIn no. Sin esta ventana, el segundo toque
-    // de un doble toque cae sobre un botón invisible.
-    it('ignora cualquier pulsación nada más abrirse', async () => {
+    // de un doble toque cae sobre un botón invisible. Sólo protege a
+    // confirmar: cancelar pronto es siempre seguro.
+    it('ignora la pulsación de confirmar nada más abrirse', async () => {
       const alConfirmar = jest.fn();
-      const alCancelar = jest.fn();
       await render(
-        <DialogoConfirmar
-          visible
-          textos={textos}
-          alConfirmar={alConfirmar}
-          alCancelar={alCancelar}
-        />
+        <DialogoConfirmar visible textos={textos} alConfirmar={alConfirmar} alCancelar={jest.fn()} />
       );
 
       await pulsar(screen.getByText('Sí, quitar'));
-      await pulsar(screen.getByText('Cancelar'));
-      await pulsar(screen.getByLabelText('Cerrar sin quitar nada'));
 
       expect(alConfirmar).not.toHaveBeenCalled();
-      expect(alCancelar).not.toHaveBeenCalled();
     });
 
     it('sigue ignorando justo antes de que expire', async () => {

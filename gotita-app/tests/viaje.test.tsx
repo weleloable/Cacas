@@ -29,12 +29,28 @@ const viajeBase = {
 const mockCargarMisViajes = jest.fn();
 const mockModificarEvento = jest.fn();
 
-jest.mock('@/lib/viajes', () => ({
-  cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
-  modificarEvento: (...args: unknown[]) => mockModificarEvento(...args),
-  totalDeUsuario: (u: { eventos: Record<string, number> }) =>
-    Object.values(u.eventos ?? {}).reduce((a, b) => a + b, 0),
-}));
+// viaje.tsx hace `e instanceof ConflictoDeConcurrencia`, así que el mock del
+// módulo tiene que exportar y lanzar la misma clase o ese `catch` nunca entra.
+jest.mock('@/lib/viajes', () => {
+  class ConflictoDeConcurrencia extends Error {
+    valorEnServidor: number;
+    constructor(valorEnServidor: number) {
+      super('conflicto');
+      this.name = 'ConflictoDeConcurrencia';
+      this.valorEnServidor = valorEnServidor;
+    }
+  }
+  return {
+    cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
+    modificarEvento: (...args: unknown[]) => mockModificarEvento(...args),
+    ConflictoDeConcurrencia,
+    totalDeUsuario: (u: { eventos: Record<string, number> }) =>
+      Object.values(u.eventos ?? {}).reduce((a, b) => a + b, 0),
+  };
+});
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ConflictoDeConcurrencia } = require('@/lib/viajes');
 
 // La sesión es un objeto mutable a propósito: cambiar su identidad es lo que
 // hace Supabase al refrescar el token, y es lo que dispara la recarga.
@@ -89,6 +105,11 @@ function renderPantalla() {
 async function pulsar(elemento: Parameters<typeof fireEvent.press>[0]) {
   await act(async () => {
     fireEvent.press(elemento);
+    // Vacía varias vueltas de microtask: el camino de error de
+    // alConfirmarResta encadena `await modificarEvento` (rechaza) → catch →
+    // `await recargar()` → `await cargarMisViajes`, y una sola vuelta no basta
+    // para que el estado de la última vuelta llegue a pintarse.
+    for (let i = 0; i < 6; i++) await Promise.resolve();
   });
 }
 
@@ -99,19 +120,42 @@ async function armar() {
   });
 }
 
+/**
+ * Servidor de mentira con estado propio, para que `modificarEvento` pueda
+ * comprobar el `valorEsperado` contra "lo que hay ahora mismo" en vez de
+ * contra una fórmula fija. Es lo único que puede reproducir de verdad el
+ * conflicto de concurrencia: el cliente pide restar de 3, pero el servidor ya
+ * tiene 5 porque otro dispositivo sumó entre medias.
+ */
+function servidorDeMentira(cacasIniciales: number) {
+  const estado = { cacas: cacasIniciales };
+  mockModificarEvento.mockImplementation(
+    async (_id: number, _u: string, clave: string, delta: number, valorEsperado?: number) => {
+      const actual = estado[clave as keyof typeof estado] ?? 0;
+      if (valorEsperado !== undefined && actual !== valorEsperado) {
+        throw new ConflictoDeConcurrencia(actual);
+      }
+      estado[clave as keyof typeof estado] = Math.max(0, actual + delta);
+      return {
+        ...viajeBase,
+        usuarios: {
+          [USUARIO]: {
+            nombre: 'Dudu',
+            eventos: { ...viajeBase.usuarios[USUARIO].eventos, [clave]: estado[clave as keyof typeof estado] },
+          },
+        },
+      };
+    }
+  );
+  return estado;
+}
+
 beforeEach(() => {
   jest.useFakeTimers();
   mockSesion.valor = { user: { id: USUARIO } };
   mockCargarMisViajes.mockReset().mockResolvedValue([viajeBase]);
-  mockModificarEvento.mockReset().mockImplementation(async (_id, _u, clave, delta) => ({
-    ...viajeBase,
-    usuarios: {
-      [USUARIO]: {
-        nombre: 'Dudu',
-        eventos: { ...viajeBase.usuarios[USUARIO].eventos, [clave]: 3 + delta },
-      },
-    },
-  }));
+  mockModificarEvento.mockReset();
+  servidorDeMentira(3);
 });
 
 afterEach(() => {
@@ -129,7 +173,7 @@ describe('botón − de la pantalla de viaje', () => {
     expect(mockModificarEvento).not.toHaveBeenCalled();
   });
 
-  it('confirmar sí resta, con delta -1', async () => {
+  it('confirmar sí resta, con delta -1 y el valor esperado que prometió el diálogo', async () => {
     await renderPantalla();
 
     await pulsar(screen.getByLabelText('Quitar uno de Cacas'));
@@ -137,7 +181,7 @@ describe('botón − de la pantalla de viaje', () => {
     await pulsar(screen.getByLabelText('Sí, quitar'));
 
     expect(mockModificarEvento).toHaveBeenCalledTimes(1);
-    expect(mockModificarEvento).toHaveBeenCalledWith(1, USUARIO, 'cacas', -1);
+    expect(mockModificarEvento).toHaveBeenCalledWith(1, USUARIO, 'cacas', -1, 3);
   });
 
   it('cancelar no escribe nada y cierra el diálogo', async () => {
@@ -169,13 +213,16 @@ describe('botón − de la pantalla de viaje', () => {
     expect(screen.getByText('¿Quitar 1 de cacas?')).toBeTruthy();
   });
 
-  it('cancelar tampoco funciona dentro de la ventana, para que no se cierre a ciegas', async () => {
+  it('cancelar sí funciona dentro de la ventana: cancelar pronto nunca es un problema', async () => {
+    // A diferencia de confirmar, cancelar no lleva la espera de armado: no
+    // destruye nada, así que no hay doble toque que proteger.
     await renderPantalla();
 
     await pulsar(screen.getByLabelText('Quitar uno de Cacas'));
     await pulsar(screen.getByLabelText('Cancelar'));
 
-    expect(screen.getByText('¿Quitar 1 de cacas?')).toBeTruthy();
+    expect(screen.queryByText('¿Quitar 1 de cacas?')).toBeNull();
+    expect(mockModificarEvento).not.toHaveBeenCalled();
   });
 
   it('pasada la ventana, el mismo toque sí confirma', async () => {
@@ -205,30 +252,35 @@ describe('botón − de la pantalla de viaje', () => {
     expect(mockModificarEvento).toHaveBeenCalledWith(1, USUARIO, 'cacas', 1);
   });
 
-  it('si la cuenta cambia con el diálogo abierto, no resta y lo dice', async () => {
-    // Pasa de verdad: Supabase dispara TOKEN_REFRESHED al volver a la pestaña,
-    // cambia la identidad de `session` y la pantalla recarga sola.
+  it('si otro dispositivo sumó mientras el diálogo estaba abierto, no resta y lo dice', async () => {
+    // El caso real que esto protege: no hace falta que la pantalla local se
+    // entere de nada (sin ese `recargar` de por medio también tiene que
+    // funcionar), basta con que el SERVIDOR ya no tenga el valor que el
+    // diálogo prometió. Es `modificarEvento` quien lo descubre al escribir.
+    const servidor = servidorDeMentira(3);
     await renderPantalla();
 
     await pulsar(screen.getByLabelText('Quitar uno de Cacas'));
     await armar();
 
-    // Alguien suma desde otro móvil, y al volver a la pestaña Supabase
-    // refresca el token: `session` cambia de identidad y la pantalla recarga.
-    mockCargarMisViajes.mockResolvedValue([
-      { ...viajeBase, usuarios: { [USUARIO]: { nombre: 'Dudu', eventos: { cacas: 5, pises: 0 } } } },
-    ]);
-    mockSesion.valor = { user: { id: USUARIO } };
-    await act(async () => {
-      screen.rerender(arbol());
-    });
-
-    // El 5 sale dos veces: el contador de la tarjeta y el total del ranking.
-    expect(screen.getAllByText('5').length).toBeGreaterThan(0);
+    servidor.cacas = 5; // alguien sumó 2 desde otro móvil, sin que esta pantalla se entere
 
     await pulsar(screen.getByLabelText('Sí, quitar'));
 
-    expect(mockModificarEvento).not.toHaveBeenCalled();
     expect(screen.getByText(/La cuenta cambió mientras confirmabas/)).toBeTruthy();
+    expect(screen.getByText(/ahora hay 5/)).toBeTruthy();
+    expect(servidor.cacas).toBe(5); // no se ha tocado
+  });
+
+  it('un error normal de guardado también avisa con el mensaje del servidor', async () => {
+    servidorDeMentira(3);
+    mockModificarEvento.mockRejectedValueOnce(new Error('Fallo de red simulado'));
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Quitar uno de Cacas'));
+    await armar();
+    await pulsar(screen.getByLabelText('Sí, quitar'));
+
+    expect(screen.getByText('Fallo de red simulado')).toBeTruthy();
   });
 });

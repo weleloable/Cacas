@@ -55,6 +55,17 @@ function inyectarPwa(html, base) {
     <meta name="apple-mobile-web-app-title" content="Gotita" />
     <style>html,body{background-color:#0B1020}body{overscroll-behavior-y:none}</style>
     <script>
+      // Capturado aquí y no en el componente: Chrome dispara este evento una
+      // sola vez por carga, en cuanto la web cumple los criterios, que suele
+      // ser antes de que React monte nada. Si el usuario está en /login (la
+      // pantalla inicial de cualquiera sin sesión) cuando eso pasa, un
+      // listener que sólo vive dentro de la pantalla de viaje nunca lo oye y
+      // el aviso de instalar no aparece jamás en esa carga.
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__eventoInstalable = e;
+        window.dispatchEvent(new Event('gotita:instalable'));
+      });
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker

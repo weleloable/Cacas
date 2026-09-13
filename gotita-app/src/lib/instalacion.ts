@@ -16,6 +16,22 @@ export type EventoDeInstalacion = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
+declare global {
+  interface Window {
+    /**
+     * Capturado por el script inyectado en el <head> (scripts/preparar-web.js),
+     * no por React. Chrome dispara `beforeinstallprompt` una sola vez por
+     * carga, normalmente antes de que la app monte nada; un listener puesto
+     * dentro de un componente que sólo existe en la pantalla de viaje se lo
+     * pierde si el usuario arrancó en /login.
+     */
+    __eventoInstalable?: EventoDeInstalacion;
+  }
+}
+
+/** Nombre del evento con el que el script del head avisa de que ya hay uno. */
+export const EVENTO_INSTALABLE_DISPONIBLE = 'gotita:instalable';
+
 /**
  * iOS, incluido el iPad moderno, que se presenta como Mac.
  * `maxTouchPoints` es lo que lo distingue de un Mac de verdad.
@@ -50,5 +66,13 @@ export function queOfrecer(opciones: {
   return opciones.ios ? 'ayudaIOS' : 'nada';
 }
 
-export const AYUDA_IOS =
+export const AYUDA_IOS_SAFARI =
   'Toca Compartir abajo y luego "Añadir a pantalla de inicio". Se abrirá como una app, sin la barra del navegador.';
+
+export const AYUDA_IOS_OTRO_NAVEGADOR =
+  'En iPhone/iPad, "Añadir a pantalla de inicio" sólo está en Safari. Abre esta página con Safari para instalarla.';
+
+/** Chrome o Firefox en iOS son Safari por dentro (Apple obliga a WebKit), pero sin el menú de compartir de Safari. */
+export function esSafariIOS(userAgent: string): boolean {
+  return !/CriOS|FxiOS|EdgiOS|OPiOS/.test(userAgent);
+}

@@ -1,4 +1,11 @@
-import { esIOS, estaInstalada, queOfrecer, AYUDA_IOS } from '@/lib/instalacion';
+import {
+  esIOS,
+  esSafariIOS,
+  estaInstalada,
+  queOfrecer,
+  AYUDA_IOS_SAFARI,
+  AYUDA_IOS_OTRO_NAVEGADOR,
+} from '@/lib/instalacion';
 
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
@@ -7,6 +14,10 @@ const IPAD_MODERNO =
 const ANDROID =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0 Mobile Safari/537.36';
 const MAC = IPAD_MODERNO;
+const CHROME_IOS =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/127.0.6533.72 Mobile/15E148 Safari/604.1';
+const FIREFOX_IOS =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/127.0 Mobile/15E148 Safari/605.1.15';
 
 describe('esIOS', () => {
   it('reconoce iPhone', () => {
@@ -62,9 +73,32 @@ describe('queOfrecer', () => {
   });
 });
 
-describe('AYUDA_IOS', () => {
+describe('AYUDA_IOS_SAFARI', () => {
   it('nombra los dos pasos reales de Safari', () => {
-    expect(AYUDA_IOS).toContain('Compartir');
-    expect(AYUDA_IOS).toContain('Añadir a pantalla de inicio');
+    expect(AYUDA_IOS_SAFARI).toContain('Compartir');
+    expect(AYUDA_IOS_SAFARI).toContain('Añadir a pantalla de inicio');
+  });
+});
+
+describe('AYUDA_IOS_OTRO_NAVEGADOR', () => {
+  it('avisa de que hay que cambiar a Safari', () => {
+    expect(AYUDA_IOS_OTRO_NAVEGADOR).toContain('Safari');
+  });
+});
+
+describe('esSafariIOS', () => {
+  // "Añadir a pantalla de inicio" sólo existe en el menú de compartir de
+  // Safari. Chrome y Firefox en iOS son Safari por dentro (Apple obliga a
+  // WebKit) pero no tienen ese menú, así que hay que distinguirlos.
+  it('Safari de verdad da true', () => {
+    expect(esSafariIOS(IPHONE)).toBe(true);
+  });
+
+  it('Chrome en iOS (CriOS) da false', () => {
+    expect(esSafariIOS(CHROME_IOS)).toBe(false);
+  });
+
+  it('Firefox en iOS (FxiOS) da false', () => {
+    expect(esSafariIOS(FIREFOX_IOS)).toBe(false);
   });
 });
