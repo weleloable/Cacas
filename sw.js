@@ -4,30 +4,32 @@
  * Dos razones para que exista:
  *  1. Chrome en Android no ofrece "Instalar aplicación" sin un service worker
  *     que tenga un manejador de `fetch`. El manifest solo no basta.
- *  2. Estando instalada, la app abre aunque el móvil no tenga cobertura. Los
- *     contadores no se guardan sin red, pero la pantalla no es un dinosaurio.
+ *  2. Estando instalada, la app abre sin cobertura a partir de la segunda
+ *     visita. Los contadores no se guardan sin red, pero la pantalla no es un
+ *     dinosaurio. La primera visita necesita red: el registro ocurre en el
+ *     evento `load`, o sea después de que el bundle ya se haya bajado sin
+ *     pasar por el service worker.
  *
  * Estrategia, y el porqué de cada rama:
  *  - Navegaciones: red primero. El index.html apunta a un bundle con hash en
  *    el nombre, así que servirlo de caché dejaría la app clavada en la versión
  *    vieja para siempre. Si no hay red, cae al index cacheado.
- *  - Estáticos de /_expo/static/: caché primero. Llevan hash en el nombre, o
- *    sea que un nombre dado nunca cambia de contenido.
+ *  - Estáticos de /_expo/static/ e iconos: caché primero. Llevan hash en el
+ *    nombre, o sea que un nombre dado nunca cambia de contenido.
  *  - Todo lo demás (Supabase, cualquier otro origen): ni se toca. Cachear
  *    respuestas de la API serviría contadores viejos como si fueran buenos.
+ *
+ * VERSION y PRECARGA los reescribe `scripts/preparar-web.js` en cada build,
+ * con el hash del bundle. Así la caché vieja se borra sola al desplegar, sin
+ * depender de que alguien se acuerde de subir un número a mano.
  */
 
-const VERSION = 'gotita-v1';
-const CACHE = `gotita-${VERSION}`;
+// Estas dos líneas las reescribe el build, buscándolas por su texto exacto.
+// Si no las encuentra, el build falla en vez de publicar un sw a medias.
+const VERSION = "af8c0a4b1406";
+const DEL_ARRANQUE = ["./","./manifest.json","./iconos/icono-192.png","./iconos/icono-512.png","./_expo/static/js/web/entry-af8c0a4b1406226adbfd2b4c345b90bc.js"];
 
-// Rutas relativas al scope, que es donde está el sw. Así funciona igual en
-// /Cacas/ que en la raíz si algún día cambia el baseUrl.
-const DEL_ARRANQUE = [
-  './',
-  './manifest.json',
-  './iconos/icono-192.png',
-  './iconos/icono-512.png',
-];
+const CACHE = `gotita-${VERSION}`;
 
 const INDICE = new URL('./', self.registration.scope).href;
 
@@ -58,10 +60,6 @@ self.addEventListener('activate', (evento) => {
   );
 });
 
-self.addEventListener('message', (evento) => {
-  if (evento.data === 'saltar-espera') self.skipWaiting();
-});
-
 self.addEventListener('fetch', (evento) => {
   const peticion = evento.request;
   if (peticion.method !== 'GET') return;
@@ -84,7 +82,8 @@ async function redPrimero(peticion) {
   try {
     const respuesta = await fetch(peticion);
     // La SPA sirve el mismo index para toda ruta, así que se guarda bajo una
-    // clave única en vez de bajo la URL navegada.
+    // clave única en vez de bajo la URL navegada. GitHub Pages devuelve 404
+    // (con el cuerpo de la app) en rutas profundas, de ahí el `respuesta.ok`.
     if (respuesta.ok) cache.put(INDICE, respuesta.clone());
     return respuesta;
   } catch (error) {
@@ -98,7 +97,18 @@ async function cachePrimero(peticion) {
   const cache = await caches.open(CACHE);
   const guardada = await cache.match(peticion);
   if (guardada) return guardada;
-  const respuesta = await fetch(peticion);
-  if (respuesta.ok) cache.put(peticion, respuesta.clone());
-  return respuesta;
+  try {
+    const respuesta = await fetch(peticion);
+    if (respuesta.ok) cache.put(peticion, respuesta.clone());
+    return respuesta;
+  } catch (error) {
+    // Sin red y sin copia. Devolver una respuesta de error explícita en vez de
+    // dejar que `respondWith` se rechace, que en el navegador se ve como un
+    // fallo de red genérico y sin pista de qué pasó.
+    return new Response('Sin conexión y sin copia en caché.', {
+      status: 504,
+      statusText: 'Gateway Timeout',
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
 }

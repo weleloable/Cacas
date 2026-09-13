@@ -35,6 +35,17 @@
     <meta name="apple-mobile-web-app-title" content="Gotita" />
     <style>html,body{background-color:#0B1020}body{overscroll-behavior-y:none}</style>
     <script>
+      // Capturado aquí y no en el componente: Chrome dispara este evento una
+      // sola vez por carga, en cuanto la web cumple los criterios, que suele
+      // ser antes de que React monte nada. Si el usuario está en /login (la
+      // pantalla inicial de cualquiera sin sesión) cuando eso pasa, un
+      // listener que sólo vive dentro de la pantalla de viaje nunca lo oye y
+      // el aviso de instalar no aparece jamás en esa carga.
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__eventoInstalable = e;
+        window.dispatchEvent(new Event('gotita:instalable'));
+      });
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker
@@ -52,6 +63,6 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/Cacas/_expo/static/js/web/entry-b5644a63930c0131a05c3f4d3d5ed491.js" defer></script>
+  <script src="/Cacas/_expo/static/js/web/entry-af8c0a4b1406226adbfd2b4c345b90bc.js" defer></script>
 </body>
 </html>
