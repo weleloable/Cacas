@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
     <title>Gotita</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
@@ -25,7 +25,25 @@
     </style>
   <meta name="theme-color" content="#0B1020">
 <meta name="description" content="Lo que pasa en el viaje, se cuenta.">
-<link rel="icon" href="/Cacas/favicon.ico"/></head>
+<link rel="icon" href="/Cacas/favicon.ico"/>
+    <link rel="manifest" href="/Cacas/manifest.json" />
+    <link rel="apple-touch-icon" href="/Cacas/iconos/apple-touch-icon.png" />
+    <meta name="application-name" content="Gotita" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Gotita" />
+    <style>html,body{background-color:#0B1020}body{overscroll-behavior-y:none}</style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/Cacas/sw.js', { scope: '/Cacas/' })
+            .catch(function (e) { console.warn('Service worker no registrado:', e); });
+        });
+      }
+    </script>
+  </head>
 
   <body>
     <!-- Use static rendering with Expo Router to support running without JavaScript. -->
@@ -34,6 +52,6 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/Cacas/_expo/static/js/web/entry-82e47ceb07043178ccc27e195f7f41fe.js" defer></script>
+  <script src="/Cacas/_expo/static/js/web/entry-b5644a63930c0131a05c3f4d3d5ed491.js" defer></script>
 </body>
 </html>
