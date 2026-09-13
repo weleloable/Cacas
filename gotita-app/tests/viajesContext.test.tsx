@@ -149,6 +149,43 @@ describe('ViajesProvider', () => {
     expect(screen.getByTestId('error')).toHaveTextContent('sin red');
   });
 
+  it('una recarga en vuelo desde antes del logout no repuebla tras el vaciado', async () => {
+    // La secuencia exacta que el vaciado por sí solo no cubre: una petición
+    // de red ya en marcha desde antes de cerrar sesión, que resuelve TARDE,
+    // después de que el logout ya haya vaciado el estado. Sin el guard de
+    // "petición superada", esta respuesta tardía repuebla `viajes` con los
+    // datos del usuario que ya se fue.
+    let resolverTarde!: (v: typeof viaje1[]) => void;
+    mockCargarMisViajes.mockReset().mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolverTarde = resolve;
+      })
+    );
+
+    await act(async () => {
+      render(arbol());
+    });
+    // La carga del montaje se ha lanzado y sigue en vuelo (la promesa de
+    // arriba todavía no se ha resuelto): cantidad sigue a 0.
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('0');
+
+    // Se cierra sesión mientras esa petición sigue pendiente.
+    mockSesion.valor = null;
+    await act(async () => {
+      screen.rerender(arbol());
+    });
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('0');
+
+    // Ahora, tarde, resuelve la petición de antes del logout.
+    await act(async () => {
+      resolverTarde([viaje1, viaje2]);
+    });
+
+    // No debe haber repoblado nada: sigue vacío.
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('0');
+    expect(screen.getByTestId('activo')).toHaveTextContent('ninguno');
+  });
+
   it('cerrar sesión vacía el estado, no lo deja colgado para el siguiente', async () => {
     // El proveedor vive en el _layout.tsx raíz: a diferencia de vivir dentro
     // de (tabs) (donde cerrar sesión lo desmontaría entero y lo limpiaría

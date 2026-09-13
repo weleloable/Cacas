@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -58,17 +59,30 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Cuenta la petición de carga más reciente. Sin esto, una `recargar()`
+  // lanzada por el usuario A que sigue en vuelo cuando A cierra sesión (o B
+  // entra detrás en el mismo móvil) puede resolver DESPUÉS del vaciado de
+  // logout y repoblar `viajes` con los datos de A: justo lo que el vaciado
+  // de abajo dice estar evitando. Cada llamada se apunta un número; al
+  // resolver, sólo aplica su resultado si sigue siendo la más reciente que
+  // se ha pedido, sea por lo que sea (logout, otro recargar, un cambio de
+  // usuario).
+  const idPeticion = useRef(0);
+
   const recargar = useCallback(
     async (tocarError = true) => {
       if (!userId) return;
+      const miId = ++idPeticion.current;
       try {
         const mios = await cargarMisViajes(userId);
+        if (idPeticion.current !== miId) return; // superada mientras estaba en vuelo
         setViajes(mios);
         setViajeActivoIdInterno((actual) =>
           actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
         );
         if (tocarError) setError(null);
       } catch (e) {
+        if (idPeticion.current !== miId) return;
         if (tocarError) {
           setError(e instanceof Error ? e.message : 'No hemos podido cargar tus viajes.');
         }
@@ -90,6 +104,10 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
       // Sesión cerrada (o todavía no iniciada). No basta con no pedir nada:
       // hay que soltar lo que hubiera de una sesión anterior, o se queda
       // colgado en memoria para quien entre después en el mismo dispositivo.
+      // El incremento invalida cualquier `recargar()` que siguiera en vuelo
+      // desde antes del logout: aunque resuelva después, su guard de arriba
+      // verá que ya no es la petición más reciente y no pisará este vaciado.
+      idPeticion.current++;
       setViajes([]);
       setViajeActivoIdInterno(null);
       setError(null);

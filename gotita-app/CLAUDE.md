@@ -102,6 +102,13 @@ Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
   explícitamente en cuanto `userId` queda vacío — si no lo hiciera, en un
   móvil compartido entre varias personas del viaje, quien entrase después
   vería un parpadeo con los viajes de quien usó la app justo antes.
+  El vaciado por sí solo no basta: una `recargar()` que ya estuviera en
+  vuelo desde ANTES del logout puede resolver después y repoblar `viajes`
+  con los datos de quien ya se fue. `idPeticion` (un contador en un `ref`)
+  marca cuál es la petición más reciente; al resolver, cada llamada
+  comprueba que sigue siéndolo antes de aplicar su resultado, y el propio
+  vaciado de logout también incrementa el contador para invalidar lo que
+  hubiera en vuelo.
 - Perfil permite cambiar el nombre. Eso NO es sólo `auth.updateUser`: el
   nombre de cada viaje es una copia guardada en su JSON `usuarios` (ver
   "Decisiones tomadas"), así que `actualizarNombreEnMisViajes` (lib/viajes.ts)
