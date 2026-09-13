@@ -6,6 +6,9 @@
  * standalone, iconos de 192 y 512, y un service worker con manejador de fetch.
  * Falla uno y no hay aviso de error en ningún sitio: el botón simplemente no
  * aparece. Por eso están aquí, uno a uno.
+ *
+ * El comportamiento del service worker se prueba ejecutándolo, en sw.test.ts.
+ * Aquí sólo va lo estático: el manifest, los iconos y la inyección en el HTML.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,6 +17,9 @@ const raiz = join(__dirname, '..');
 const publico = join(raiz, 'public');
 const manifest = JSON.parse(readFileSync(join(publico, 'manifest.json'), 'utf8'));
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { inyectarPwa, rutasDelBundle, ErrorDePreparacion } = require('../scripts/preparar-web.js');
+
 /** Lee ancho y alto del IHDR de un PNG, sin dependencias. */
 function tamañoPng(ruta: string): { ancho: number; alto: number } {
   const b = readFileSync(ruta);
@@ -21,36 +27,58 @@ function tamañoPng(ruta: string): { ancho: number; alto: number } {
   return { ancho: b.readUInt32BE(16), alto: b.readUInt32BE(20) };
 }
 
+type Icono = { src: string; sizes: string; type: string; purpose: string };
+
+/** ¿Hay un icono PNG de al menos `lado` px con este propósito? */
+function hayIcono(lado: number, purpose: string): boolean {
+  return manifest.icons.some((i: Icono) => {
+    const [ancho] = i.sizes.split('x').map(Number);
+    return (
+      i.type === 'image/png' &&
+      ancho >= lado &&
+      i.purpose.split(/\s+/).includes(purpose) &&
+      existsSync(join(publico, i.src))
+    );
+  });
+}
+
 describe('manifest.json', () => {
   it('tiene los campos que Chrome exige para instalar', () => {
-    expect(manifest.name).toBe('Gotita');
-    expect(manifest.short_name).toBe('Gotita');
+    expect(manifest.name || manifest.short_name).toBeTruthy();
     expect(manifest.start_url).toBeTruthy();
     expect(manifest.display).toBe('standalone');
-    expect(manifest.background_color).toBe('#0B1020');
-    expect(manifest.theme_color).toBe('#0B1020');
+    expect(manifest.prefer_related_applications).toBeFalsy();
   });
 
-  it('start_url y scope son relativos, para no romperse si cambia el baseUrl', () => {
+  it('start_url, scope e id son relativos, para no romperse si cambia el baseUrl', () => {
     // Están servidos desde /Cacas/. Absolutos habría que tocarlos a mano el día
-    // que la app se mueva de sitio, y nadie se acordaría.
+    // que la app se mueva de sitio, y nadie se acordaría. El `id` cuenta: es la
+    // identidad de la instalación.
     expect(manifest.start_url).toBe('./');
     expect(manifest.scope).toBe('./');
+    expect(manifest.id).toBe('./');
   });
 
-  it('trae los iconos de 192 y 512 en variante normal y maskable', () => {
-    const clave = (i: { sizes: string; purpose: string }) => `${i.sizes} ${i.purpose}`;
-    const presentes = manifest.icons.map(clave).sort();
-    expect(presentes).toEqual([
-      '192x192 any',
-      '192x192 maskable',
-      '512x512 any',
-      '512x512 maskable',
-    ]);
+  it('los colores coinciden con el tema de la app, para que no pegue un fogonazo al abrir', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { tema } = require('@/lib/tema');
+    expect(manifest.background_color).toBe(tema.fondo);
+    expect(manifest.theme_color).toBe(tema.fondo);
+  });
+
+  it('cumple el criterio de iconos: >=192 y >=512 en purpose any', () => {
+    // Por criterio, no por lista exacta: añadir tamaños no debe romper el test.
+    expect(hayIcono(192, 'any')).toBe(true);
+    expect(hayIcono(512, 'any')).toBe(true);
+  });
+
+  it('trae maskable, que es lo que evita que Android recorte el dibujo', () => {
+    expect(hayIcono(192, 'maskable')).toBe(true);
+    expect(hayIcono(512, 'maskable')).toBe(true);
   });
 
   it('cada icono existe y mide de verdad lo que dice medir', () => {
-    for (const icono of manifest.icons) {
+    for (const icono of manifest.icons as Icono[]) {
       const ruta = join(publico, icono.src);
       expect(existsSync(ruta)).toBe(true);
       const [ancho, alto] = icono.sizes.split('x').map(Number);
@@ -65,40 +93,17 @@ describe('manifest.json', () => {
   });
 });
 
-describe('service worker', () => {
-  const sw = readFileSync(join(publico, 'sw.js'), 'utf8');
-
-  it('tiene manejador de fetch, que es el criterio real de Chrome', () => {
-    expect(sw).toMatch(/addEventListener\(\s*['"]fetch['"]/);
-  });
-
-  it('no cachea nada de otro origen: Supabase no se sirve de caché', () => {
-    expect(sw).toContain('url.origin !== self.location.origin');
-  });
-
-  it('las navegaciones van a red primero, para no clavar la app en una versión vieja', () => {
-    expect(sw).toMatch(/mode === 'navigate'/);
-    expect(sw).toContain('redPrimero');
-  });
-});
-
 describe('inyección en el HTML del build', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { inyectarPwa } = require('../scripts/preparar-web.js');
-
-  // El index.html que escupe `expo export`, recortado a lo que toca el script.
-  const original = [
-    '<!DOCTYPE html>',
-    '<html lang="en">',
-    '  <head>',
-    '    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />',
-    '    <title>Gotita</title>',
-    '  </head>',
-    '  <body><div id="root"></div></body>',
-    '</html>',
-  ].join('\n');
-
+  // El index.html real que escupe `expo export`, capturado del build. No es una
+  // plantilla escrita a mano: si Expo cambia la suya en un SDK nuevo, esta se
+  // queda vieja, y para eso está el test de "revienta si no encaja".
+  const original = readFileSync(join(__dirname, 'fixtures/expo-index.html'), 'utf8');
   const resultado: string = inyectarPwa(original, '/Cacas');
+
+  it('el fixture es el HTML crudo de Expo, sin nada inyectado', () => {
+    expect(original).toContain('<html lang="en">');
+    expect(original).not.toContain('rel="manifest"');
+  });
 
   it('enlaza el manifest y el icono de iOS con el baseUrl delante', () => {
     expect(resultado).toContain('<link rel="manifest" href="/Cacas/manifest.json" />');
@@ -112,6 +117,7 @@ describe('inyección en el HTML del build', () => {
   it('pone el idioma en castellano y el viewport a pantalla completa', () => {
     expect(resultado).toContain('<html lang="es">');
     expect(resultado).toContain('viewport-fit=cover');
+    expect(resultado).not.toContain('<html lang="en">');
   });
 
   it('funciona igual servido desde la raíz', () => {
@@ -125,10 +131,36 @@ describe('inyección en el HTML del build', () => {
     expect(dosVeces).toBe(resultado);
     expect(dosVeces.match(/rel="manifest"/g)).toHaveLength(1);
   });
+
+  it('revienta si el HTML no es el que espera, en vez de publicar en silencio', () => {
+    // El día que Expo cambie su plantilla, esto es lo que evita publicar una
+    // web que ya no se puede instalar y que nadie se entere.
+    expect(() => inyectarPwa('<html lang="en"><head></head></html>', '/Cacas')).toThrow(
+      ErrorDePreparacion
+    );
+    expect(() => inyectarPwa('<html lang="en"><head></head></html>', '/Cacas')).toThrow(
+      /viewport/
+    );
+  });
+
+  it('encuentra el bundle con hash para poder precargarlo', () => {
+    const rutas: string[] = rutasDelBundle(original, '/Cacas');
+    expect(rutas.length).toBeGreaterThan(0);
+    for (const r of rutas) {
+      expect(r).toMatch(/^\.\/_expo\/static\/js\/web\/entry-[0-9a-f]+\.js$/);
+    }
+  });
+
+  it('revienta si no hay bundle: sin él la app no arranca sin red', () => {
+    expect(() => rutasDelBundle('<html><body></body></html>', '/Cacas')).toThrow(
+      ErrorDePreparacion
+    );
+  });
 });
 
-// Estos sólo corren si hay un build hecho. Es la comprobación de que Expo
-// copia public/ al dist, que es la pieza de la que depende todo lo demás.
+// Estos sólo corren si hay un build hecho, porque dist/ está en .gitignore. No
+// son la red de seguridad (esa son los de arriba, que corren siempre), sino la
+// comprobación de que Expo sigue copiando public/ al dist.
 const dist = join(raiz, 'dist');
 const hayBuild = existsSync(join(dist, 'index.html'));
 (hayBuild ? describe : describe.skip)('dist/ generado', () => {
@@ -148,5 +180,11 @@ const hayBuild = existsSync(join(dist, 'index.html'));
     expect(readFileSync(join(dist, 'index.html'), 'utf8')).toContain(
       '<link rel="manifest" href="/Cacas/manifest.json" />'
     );
+  });
+
+  it('el sw del dist ya no tiene los valores de desarrollo', () => {
+    const sw = readFileSync(join(dist, 'sw.js'), 'utf8');
+    expect(sw).not.toContain("const VERSION = 'desarrollo';");
+    expect(sw).toMatch(/const DEL_ARRANQUE = \[.*_expo\/static.*\];/);
   });
 });

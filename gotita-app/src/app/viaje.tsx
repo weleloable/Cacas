@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AvisoInstalar } from '@/componentes/AvisoInstalar';
 import { DialogoConfirmar } from '@/componentes/DialogoConfirmar';
 import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
@@ -95,15 +96,38 @@ export default function PantallaViaje() {
   }
 
   /** El − no resta: abre el diálogo. Restar de verdad es `alConfirmarResta`. */
+  // Si el viaje activo cambia con el diálogo abierto, la resta caería en otro
+  // viaje. Se cierra y se vuelve a empezar.
+  useEffect(() => {
+    setPorRestar(null);
+  }, [viajeActivoId]);
+
   function alPedirResta(claveEvento: string, cuentaActual: number) {
     if (!sePuedeRestar(cuentaActual)) return;
     setPorRestar({ clave: claveEvento, cuenta: cuentaActual });
   }
 
+  /**
+   * Confirmar no aplica a ciegas lo que decía el diálogo.
+   *
+   * Entre abrirlo y confirmarlo puede haber entrado un `recargar()`: Supabase
+   * dispara TOKEN_REFRESHED al volver a la pestaña, eso cambia la identidad de
+   * `session` y el efecto de arriba recarga. Si la cuenta ya no es la que se
+   * enseñó, el texto del diálogo miente, así que no se resta y se dice por qué.
+   */
   function alConfirmarResta() {
     if (!porRestar) return;
-    alPulsar(porRestar.clave, -1);
+    const cuentaAhora = viaje?.usuarios?.[userId]?.eventos?.[porRestar.clave] ?? 0;
     setPorRestar(null);
+
+    if (cuentaAhora !== porRestar.cuenta) {
+      setError(
+        `La cuenta cambió mientras confirmabas (ahora hay ${cuentaAhora}). No se ha quitado nada, vuelve a intentarlo.`
+      );
+      return;
+    }
+    if (!sePuedeRestar(cuentaAhora)) return;
+    alPulsar(porRestar.clave, -1);
   }
 
   async function alRefrescar() {
@@ -129,13 +153,18 @@ export default function PantallaViaje() {
 
   return (
     <ScrollView
+      testID="scroll-viaje"
       style={estilos.pantalla}
       contentContainerStyle={[
         estilos.contenido,
         { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 48 },
       ]}
       refreshControl={
-        <RefreshControl refreshing={refrescando} onRefresh={alRefrescar} tintColor={tema.acento} />
+        <RefreshControl
+          refreshing={refrescando}
+          onRefresh={alRefrescar}
+          tintColor={tema.acento}
+        />
       }>
       <View style={estilos.cabecera}>
         <View style={estilos.cabeceraTextos}>
@@ -259,6 +288,8 @@ export default function PantallaViaje() {
           </View>
         </>
       )}
+
+      <AvisoInstalar />
 
       <DialogoConfirmar
         visible={porRestar !== null}
