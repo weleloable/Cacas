@@ -148,6 +148,14 @@ export class ConflictoDeConcurrencia extends Error {
   }
 }
 
+// `modificarEvento` sigue siendo lectura-y-luego-escritura en dos llamadas
+// HTTP separadas, no una operación atómica: reduce la ventana de la carrera
+// (de "todo el tiempo que el diálogo de confirmación estuvo abierto" a "un
+// round-trip de red"), pero no la elimina. Dos escrituras concurrentes con el
+// mismo `valorEsperado` pueden las dos leer el mismo valor, las dos pasar la
+// comprobación, y la segunda pisar a la primera. El arreglo de verdad es la
+// RPC con `jsonb_set` que ya está pendiente en el CLAUDE.md del proyecto.
+
 export async function modificarEvento(
   viajeId: number,
   userId: string,
