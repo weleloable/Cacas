@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -14,9 +15,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import { actualizarNombreEnMisViajes } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
+
+/** La versión declarada en app.json (expo.version), leída vía expo-constants
+ * en vez de importar el JSON directamente: es la fuente de verdad en tiempo
+ * de ejecución, la misma que usan las stores para identificar el build. */
+const VERSION_APP = Constants.expoConfig?.version ?? '—';
 
 export default function Perfil() {
   const { session, userId, nombreUsuario, actualizarNombre, salir } = useAuth();
@@ -80,7 +87,10 @@ export default function Perfil() {
       <ScrollView
         contentContainerStyle={[estilos.contenido, { paddingTop: insets.top + 24 }]}
         keyboardShouldPersistTaps="handled">
-        <Text style={estilos.titulo}>👤 Perfil</Text>
+        <View style={estilos.tituloFila}>
+          <IconoDe spec={ICONOS.persona} size={24} color={tema.texto} />
+          <Text style={estilos.titulo}>Perfil</Text>
+        </View>
 
         <View style={estilos.avatar}>
           <Text style={estilos.avatarTexto}>{inicial}</Text>
@@ -127,6 +137,8 @@ export default function Perfil() {
           onPress={() => salir().then(() => router.replace('/login'))}>
           <Text style={estilos.botonSalirTexto}>Salir</Text>
         </Pressable>
+
+        <Text style={estilos.version}>Gotita v{VERSION_APP}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -136,6 +148,7 @@ const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.fondo },
   contenido: { paddingHorizontal: 24, paddingBottom: 48 },
 
+  tituloFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   titulo: { color: tema.texto, fontSize: 28, fontWeight: '800' },
 
   avatar: {
@@ -199,4 +212,12 @@ const estilos = StyleSheet.create({
     borderColor: tema.peligro,
   },
   botonSalirTexto: { color: tema.peligro, fontSize: 16, fontWeight: '800' },
+
+  version: {
+    color: tema.textoTenue,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 32,
+    letterSpacing: 0.5,
+  },
 });

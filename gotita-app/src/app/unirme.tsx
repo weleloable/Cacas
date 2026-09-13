@@ -52,7 +52,7 @@ export default function Unirme() {
           : [actualizado, ...previos]
       );
       setViajeActivoId(actualizado.id);
-      setMensaje({ tipo: 'ok', texto: `¡Dentro de ${viaje.nombre}! 🎉` });
+      setMensaje({ tipo: 'ok', texto: `¡Dentro de ${viaje.nombre}!` });
       setTimeout(() => router.replace('/viaje'), 700);
     } catch (e) {
       setMensaje({

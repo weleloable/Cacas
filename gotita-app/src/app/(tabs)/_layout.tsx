@@ -1,14 +1,9 @@
 import { Redirect, Tabs } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { tema } from '@/lib/tema';
-
-/** Icono de pestaña: un solo emoji, como el resto de la app (nada de librería
- * de iconos nueva, aquí todo se dice con emoji: 💩💧🍺🏆...). */
-function Icono({ simbolo, activo }: { simbolo: string; activo: boolean }) {
-  return <Text style={[estilos.icono, { opacity: activo ? 1 : 0.55 }]}>{simbolo}</Text>;
-}
 
 /**
  * Las cuatro pestañas de la app, sólo para quien ha iniciado sesión.
@@ -52,28 +47,28 @@ export default function LayoutPestanas() {
         name="viaje"
         options={{
           title: 'Mi Viaje',
-          tabBarIcon: ({ focused }) => <Icono simbolo="💧" activo={focused} />,
+          tabBarIcon: ({ color, size }) => <IconoDe spec={ICONOS.gota} size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="mis-viajes"
         options={{
           title: 'Mis viajes',
-          tabBarIcon: ({ focused }) => <Icono simbolo="🧳" activo={focused} />,
+          tabBarIcon: ({ color, size }) => <IconoDe spec={ICONOS.maleta} size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="crear"
         options={{
           title: 'Crear viaje',
-          tabBarIcon: ({ focused }) => <Icono simbolo="✈️" activo={focused} />,
+          tabBarIcon: ({ color, size }) => <IconoDe spec={ICONOS.avion} size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="perfil"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ focused }) => <Icono simbolo="👤" activo={focused} />,
+          tabBarIcon: ({ color, size }) => <IconoDe spec={ICONOS.persona} size={size} color={color} />,
         }}
       />
     </Tabs>
@@ -82,5 +77,4 @@ export default function LayoutPestanas() {
 
 const estilos = StyleSheet.create({
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.fondo },
-  icono: { fontSize: 20 },
 });

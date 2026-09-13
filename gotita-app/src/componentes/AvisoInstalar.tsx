@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import {
   AYUDA_IOS_OTRO_NAVEGADOR,
@@ -84,7 +85,9 @@ export function AvisoInstalar() {
           if (eleccion.outcome === 'dismissed') setDescartado(true);
         }}
         style={({ pressed }) => [estilos.tarjeta, estilos.filaPrincipal, pressed && estilos.pulsado]}>
-        <Text style={estilos.emoji}>📲</Text>
+        <View style={estilos.iconoCirculo}>
+          <IconoDe spec={ICONOS.instalar} size={20} color={tema.acento} />
+        </View>
         <View style={estilos.textos}>
           <Text style={estilos.titulo}>Instalar Gotita</Text>
           <Text style={estilos.texto}>Se abre como una app, sin barra del navegador.</Text>
@@ -102,7 +105,9 @@ export function AvisoInstalar() {
         accessibilityRole="button"
         onPress={() => (safari ? setAyudaAbierta((a) => !a) : setDescartado(true))}
         style={estilos.filaPrincipal}>
-        <Text style={estilos.emoji}>📲</Text>
+        <View style={estilos.iconoCirculo}>
+          <IconoDe spec={ICONOS.instalar} size={20} color={tema.acento} />
+        </View>
         <View style={estilos.textos}>
           <Text style={estilos.titulo}>Instalar Gotita</Text>
           <Text style={estilos.texto}>
@@ -135,7 +140,14 @@ const estilos = StyleSheet.create({
     gap: 8,
   },
   filaPrincipal: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  emoji: { fontSize: 24 },
+  iconoCirculo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: tema.tarjeta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   textos: { flex: 1 },
   titulo: { color: tema.texto, fontSize: 15, fontWeight: '800' },
   texto: { color: tema.textoTenue, fontSize: 13, marginTop: 2, lineHeight: 18 },

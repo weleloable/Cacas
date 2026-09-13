@@ -16,6 +16,7 @@ import { DialogoConfirmar } from '@/componentes/DialogoConfirmar';
 import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import { ConflictoDeConcurrencia, modificarEvento, totalDeUsuario } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
@@ -191,7 +192,10 @@ export default function PantallaViaje() {
         <RefreshControl refreshing={refrescando} onRefresh={alRefrescar} tintColor={tema.acento} />
       }>
       <View style={estilos.cabecera}>
-        <Text style={estilos.saludo}>💧 Hola, {nombreUsuario.split(' ')[0] || 'tú'}</Text>
+        <View style={estilos.saludoFila}>
+          <IconoDe spec={ICONOS.gota} size={16} color={tema.textoTenue} />
+          <Text style={estilos.saludo}>Hola, {nombreUsuario.split(' ')[0] || 'tú'}</Text>
+        </View>
         {viaje ? <Text style={estilos.nombreViaje}>{viaje.nombre}</Text> : null}
       </View>
 
@@ -199,7 +203,7 @@ export default function PantallaViaje() {
 
       {!viaje ? (
         <View style={estilos.vacio}>
-          <Text style={estilos.vacioEmoji}>🧳</Text>
+          <IconoDe spec={ICONOS.maleta} size={56} color={tema.textoTenue} />
           <Text style={estilos.vacioTitulo}>
             {viajes.length > 0 ? 'Elige un viaje en "Mis viajes"' : 'No estás en ningún viaje'}
           </Text>
@@ -220,14 +224,17 @@ export default function PantallaViaje() {
             if (!categoria) return null;
             return (
               <View key={nombreCategoria} style={estilos.seccion}>
-                <Text style={estilos.tituloSeccion}>
-                  {categoria.emoji} {nombreCategoria}
-                </Text>
+                <View style={estilos.tituloSeccionFila}>
+                  <IconoDe spec={categoria.icono} size={18} color={tema.texto} />
+                  <Text style={estilos.tituloSeccion}>{nombreCategoria}</Text>
+                </View>
                 {Object.entries(categoria.eventos).map(([clave, evento]) => {
                   const cuenta = misEventos[clave] ?? 0;
                   return (
                     <View key={clave} style={estilos.tarjeta}>
-                      <Text style={estilos.tarjetaEmoji}>{evento.emoji}</Text>
+                      <View style={estilos.tarjetaIcono}>
+                        <IconoDe spec={evento.icono} size={22} color={tema.acento} />
+                      </View>
                       <View style={estilos.tarjetaTextos}>
                         <Text style={estilos.tarjetaNombre}>{evento.nombre}</Text>
                         <Text style={estilos.tarjetaCuenta}>{cuenta}</Text>
@@ -260,7 +267,10 @@ export default function PantallaViaje() {
           })}
 
           <View style={estilos.seccion}>
-            <Text style={estilos.tituloSeccion}>🏆 Clasificación</Text>
+            <View style={estilos.tituloSeccionFila}>
+              <IconoDe spec={ICONOS.trofeo} size={18} color={tema.texto} />
+              <Text style={estilos.tituloSeccion}>Clasificación</Text>
+            </View>
             {clasificacion.map((fila, indice) => (
               <View key={fila.clave} style={estilos.filaRanking}>
                 <Text style={estilos.puesto}>{indice + 1}</Text>
@@ -298,6 +308,7 @@ const estilos = StyleSheet.create({
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.fondo },
 
   cabecera: { gap: 2 },
+  saludoFila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   saludo: { color: tema.textoTenue, fontSize: 15, fontWeight: '600' },
   nombreViaje: { color: tema.texto, fontSize: 28, fontWeight: '800', marginTop: 2 },
 
@@ -311,13 +322,14 @@ const estilos = StyleSheet.create({
   },
 
   seccion: { marginTop: 28 },
-  tituloSeccion: {
-    color: tema.texto,
-    fontSize: 19,
-    fontWeight: '800',
+  tituloSeccionFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
     marginLeft: 2,
   },
+  tituloSeccion: { color: tema.texto, fontSize: 19, fontWeight: '800' },
 
   tarjeta: {
     flexDirection: 'row',
@@ -331,7 +343,14 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  tarjetaEmoji: { fontSize: 30 },
+  tarjetaIcono: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: tema.fondoElevado,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tarjetaTextos: { flex: 1 },
   tarjetaNombre: { color: tema.textoTenue, fontSize: 14, fontWeight: '600' },
   tarjetaCuenta: { color: tema.texto, fontSize: 30, fontWeight: '800', lineHeight: 36 },
@@ -375,7 +394,6 @@ const estilos = StyleSheet.create({
   totalRanking: { color: tema.texto, fontSize: 18, fontWeight: '800' },
 
   vacio: { alignItems: 'center', paddingTop: 70, paddingHorizontal: 12 },
-  vacioEmoji: { fontSize: 60 },
   vacioTitulo: {
     color: tema.texto,
     fontSize: 20,

@@ -34,6 +34,15 @@ jest.mock('expo-router', () => ({
   router: { replace: (...args: unknown[]) => mockReplace(...args) },
 }));
 
+// Bajo Jest, expo-constants nunca lleva el manifest real (eso lo inyecta el
+// build de Expo en tiempo de bundle, no algo que exista en un entorno de
+// test): sin este mock, expoConfig llega como `{}` y no hay forma de probar
+// que la versión se pinta de verdad, sólo el "—" del fallback.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { version: '1.0.0' } },
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ViajesProvider } = require('@/lib/viajesContext');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -172,4 +181,13 @@ describe('Perfil', () => {
     expect(mockSalir).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith('/login');
   });
+
+  it('enseña la versión de la app, abajo del todo', async () => {
+    await act(async () => {
+      renderPantalla();
+    });
+
+    expect(screen.getByText('Gotita v1.0.0')).toBeTruthy();
+  });
+
 });

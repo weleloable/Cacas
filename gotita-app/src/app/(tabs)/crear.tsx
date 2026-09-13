@@ -1,3 +1,4 @@
+import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -15,6 +16,7 @@ import {
 
 import { useAuth } from '@/lib/auth';
 import { CATEGORIAS } from '@/lib/categorias';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import { crearViaje, type Viaje } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
@@ -77,7 +79,9 @@ export default function Crear() {
   if (creado) {
     return (
       <ScrollView contentContainerStyle={estilos.contenido}>
-        <Text style={estilos.exitoEmoji}>🎉</Text>
+        <View style={estilos.exitoIcono}>
+          <IconoDe spec={ICONOS.exito} size={40} color={tema.exito} />
+        </View>
         <Text style={estilos.exitoTitulo}>{creado.nombre}</Text>
         <Text style={estilos.exitoTexto}>
           Pásales este código a tus amigos para que se unan:
@@ -121,13 +125,15 @@ export default function Crear() {
               key={nombreCategoria}
               onPress={() => alternar(nombreCategoria)}
               style={[estilos.opcion, activa && estilos.opcionActiva]}>
-              <Text style={estilos.opcionEmoji}>{categoria.emoji}</Text>
+              <View style={estilos.opcionIcono}>
+                <IconoDe spec={categoria.icono} size={22} color={tema.acento} />
+              </View>
               <View style={estilos.opcionTextos}>
                 <Text style={estilos.opcionNombre}>{nombreCategoria}</Text>
                 <Text style={estilos.opcionDetalle}>{eventos}</Text>
               </View>
               <View style={[estilos.marca, activa && estilos.marcaActiva]}>
-                {activa ? <Text style={estilos.marcaTexto}>✓</Text> : null}
+                {activa ? <Feather name="check" size={16} color="#04121C" /> : null}
               </View>
             </Pressable>
           );
@@ -179,7 +185,14 @@ const estilos = StyleSheet.create({
     marginBottom: 10,
   },
   opcionActiva: { borderColor: tema.acento },
-  opcionEmoji: { fontSize: 28 },
+  opcionIcono: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: tema.fondoElevado,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   opcionTextos: { flex: 1 },
   opcionNombre: { color: tema.texto, fontSize: 17, fontWeight: '700' },
   opcionDetalle: { color: tema.textoTenue, fontSize: 13, marginTop: 3 },
@@ -193,7 +206,6 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
   },
   marcaActiva: { backgroundColor: tema.acento, borderColor: tema.acento },
-  marcaTexto: { color: '#04121C', fontSize: 15, fontWeight: '900' },
 
   error: { color: tema.peligro, fontSize: 14, marginTop: 16, marginLeft: 4, lineHeight: 20 },
   boton: {
@@ -206,7 +218,16 @@ const estilos = StyleSheet.create({
   pulsado: { opacity: 0.75 },
   botonTexto: { color: '#04121C', fontSize: 17, fontWeight: '800' },
 
-  exitoEmoji: { fontSize: 60, textAlign: 'center', marginTop: 24 },
+  exitoIcono: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(61,214,140,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 24,
+  },
   exitoTitulo: {
     color: tema.texto,
     fontSize: 28,

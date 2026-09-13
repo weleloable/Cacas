@@ -64,8 +64,9 @@ Piezas de la PWA:
 
 ## Navegación
 
-Cuatro pestañas abajo (expo-router `Tabs`), sólo con sesión: Mi Viaje 💧,
-Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
+Cuatro pestañas abajo (expo-router `Tabs`), sólo con sesión: Mi Viaje (gota),
+Mis viajes (maleta), Crear viaje (avión de papel), Perfil (persona). Iconos
+de línea, no emoji — ver "Iconos en vez de emoji" más abajo.
 
 - `src/app/(tabs)/_layout.tsx` — un único guard de sesión para las cuatro
   (antes cada pantalla comprobaba `session` por su cuenta). Sin sesión,
@@ -117,6 +118,12 @@ Mis viajes 🧳, Crear viaje ✈️, Perfil 👤.
   la cuenta y el resto de viajes sí se actualizaron. Los viajes ya
   finalizados no se tocan (se quedan con el nombre que tenían, como registro
   histórico).
+- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.0`), leída
+  con `expo-constants` (`Constants.expoConfig?.version`), no importando
+  `app.json` directamente: es la fuente de verdad en tiempo de ejecución.
+  Bajo Jest ese manifest no existe (sólo lo inyecta el build de Expo), así
+  que `tests/perfil.test.tsx` mockea `expo-constants` explícitamente en vez
+  de fiarse del valor real.
 
 ## Icono
 
@@ -136,6 +143,35 @@ gusto:
   fondo da un contraste de ~1.1:1, invisible en el launcher.
 
 Para regenerarlo tras tocar la geometría: `npm run iconos`.
+
+## Iconos en vez de emoji
+
+Toda la interfaz usaba emoji (💧💩🍺🏆🧳✈️👤🎉📲🔑📝🗑️). Sustituidos por
+iconos de línea minimalistas: dan sensación de app cuidada, no de "hecho
+deprisa con IA".
+
+- `src/lib/iconos.tsx` es el único sitio que sabe dibujar un icono. Un
+  `IconoSpec` (`{ fuente: 'gota' }` | `{ fuente: 'feather', nombre }` |
+  `{ fuente: 'mci', nombre }`) es una REFERENCIA a un icono, no el icono en
+  sí: así se puede guardar como dato plano en `categorias.ts` o en el
+  resultado de `textosDeConfirmacion`, y decidir cómo se pinta sólo al
+  llegar a `<IconoDe spec={...} />`.
+- La gota (`ICONOS.gota`) es la MISMA silueta que el icono de la app —
+  mismo path SVG, generado con la misma geometría de
+  `scripts/generar-iconos.py` (envolvente circulo+ápice), no una imitación
+  con otra librería. Verificado en `tests/iconos.test.ts` que categoría
+  Gotitas y evento `pises` usan ese mismo spec, no uno parecido.
+- Todo lo demás sale de `@expo/vector-icons` (Feather / MaterialCommunity),
+  que ya viene con Expo. **Importar desde el submódulo, no del barrel**:
+  `import Feather from '@expo/vector-icons/Feather'`, no
+  `import { Feather } from '@expo/vector-icons'`. El barrel reexporta las
+  ~20 familias de iconos del paquete, y Metro mete el `.ttf` de cada una en
+  el bundle web aunque sólo se use una — de 4MB en 19 fuentes a 1.4MB en
+  las 2 que hacen falta, comprobado inspeccionando `dist/` tras el build.
+- Un nombre de icono mal escrito (`'toilett'` en vez de `'toilet'`) no lo
+  pilla TypeScript de forma fiable y da un icono en blanco en producción sin
+  ningún aviso. `tests/iconos.test.ts` abre el glyphmap real instalado y
+  comprueba que cada nombre usado en la app existe de verdad.
 
 ## Confirmación al restar
 
@@ -190,6 +226,9 @@ Para regenerarlo tras tocar la geometría: `npm run iconos`.
   con el `ViajesProvider` real (no una versión de mentira del contexto).
 - `viajes.test.ts` — `modificarEvento` y `actualizarNombreEnMisViajes`
   ejecutando la implementación real, mockeando sólo `supabase`.
+- `iconos.test.ts` — comprueba contra el glyphmap real instalado que cada
+  nombre de icono usado (en `ICONOS`, en `CATEGORIAS`, en el diálogo de
+  confirmación) existe de verdad, y que la gota es un único spec compartido.
 - `unirme.test.tsx` — monta `Unirme` y "Mi Viaje" JUNTAS bajo el mismo
   `ViajesProvider`, sin desmontar entre medias (así es como conviven de
   verdad dos rutas del mismo Stack). Un test que renderizase `unirme.tsx`

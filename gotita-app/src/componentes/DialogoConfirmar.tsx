@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radio, tema } from '@/lib/tema';
 import type { TextosConfirmacion } from '@/lib/confirmacion';
+import { IconoDe } from '@/lib/iconos';
 
 /**
  * Milisegundos que el diálogo ignora cualquier pulsación al abrirse.
@@ -79,7 +80,11 @@ export function DialogoConfirmar({ visible, textos, alConfirmar, alCancelar }: P
         {/* Un Pressable sin onPress se come el toque, para que tocar dentro
             del cuadro no cuente como tocar fuera y lo cierre. */}
         <Pressable style={estilos.cuadro} onPress={() => {}}>
-          <Text style={estilos.emoji}>{textos?.emoji}</Text>
+          {textos ? (
+            <View style={estilos.iconoCirculo}>
+              <IconoDe spec={textos.icono} size={26} color={tema.peligro} />
+            </View>
+          ) : null}
           <Text style={estilos.titulo} accessibilityRole="header">
             {textos?.titulo}
           </Text>
@@ -138,7 +143,14 @@ const estilos = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  emoji: { fontSize: 44 },
+  iconoCirculo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(242,85,90,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   titulo: {
     color: tema.texto,
     fontSize: 20,

@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/lib/auth';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 
 type Modo = 'entrar' | 'registrar';
@@ -75,7 +76,9 @@ export default function Login() {
       <ScrollView
         contentContainerStyle={[estilos.contenido, { paddingTop: insets.top + 40 }]}
         keyboardShouldPersistTaps="handled">
-        <Text style={estilos.logo}>💧</Text>
+        <View style={estilos.logo}>
+          <IconoDe spec={ICONOS.gota} size={40} color={tema.acento} />
+        </View>
         <Text style={estilos.titulo}>Gotita</Text>
         <Text style={estilos.subtitulo}>Lo que pasa en el viaje, se cuenta.</Text>
 
@@ -83,15 +86,25 @@ export default function Login() {
           <Pressable
             style={[estilos.pestana, !esRegistro && estilos.pestanaActiva]}
             onPress={() => cambiarModo('entrar')}>
+            <IconoDe
+              spec={ICONOS.entrar}
+              size={15}
+              color={!esRegistro ? tema.texto : tema.textoTenue}
+            />
             <Text style={[estilos.pestanaTexto, !esRegistro && estilos.pestanaTextoActivo]}>
-              🔑 Entrar
+              Entrar
             </Text>
           </Pressable>
           <Pressable
             style={[estilos.pestana, esRegistro && estilos.pestanaActiva]}
             onPress={() => cambiarModo('registrar')}>
+            <IconoDe
+              spec={ICONOS.crearCuenta}
+              size={15}
+              color={esRegistro ? tema.texto : tema.textoTenue}
+            />
             <Text style={[estilos.pestanaTexto, esRegistro && estilos.pestanaTextoActivo]}>
-              📝 Crear cuenta
+              Crear cuenta
             </Text>
           </Pressable>
         </View>
@@ -166,7 +179,17 @@ export default function Login() {
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.fondo },
   contenido: { paddingHorizontal: 24, paddingBottom: 40 },
-  logo: { fontSize: 60, textAlign: 'center' },
+  logo: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: tema.tarjeta,
+    borderWidth: 1,
+    borderColor: tema.borde,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
   titulo: { fontSize: 36, fontWeight: '800', color: tema.texto, textAlign: 'center', marginTop: 6 },
   subtitulo: {
     fontSize: 15,
@@ -183,7 +206,15 @@ const estilos = StyleSheet.create({
     padding: 4,
     gap: 4,
   },
-  pestana: { flex: 1, paddingVertical: 11, borderRadius: radio.sm, alignItems: 'center' },
+  pestana: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: radio.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pestanaActiva: { backgroundColor: tema.tarjeta },
   pestanaTexto: { color: tema.textoTenue, fontWeight: '700', fontSize: 14 },
   pestanaTextoActivo: { color: tema.texto },

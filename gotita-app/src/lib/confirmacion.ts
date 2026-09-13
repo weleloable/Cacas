@@ -7,13 +7,14 @@
  */
 
 import { infoDeEvento } from './categorias';
+import { ICONOS, type IconoSpec } from './iconos';
 
 export type TextosConfirmacion = {
   titulo: string;
   mensaje: string;
   etiquetaConfirmar: string;
   etiquetaCancelar: string;
-  emoji: string;
+  icono: IconoSpec;
 };
 
 /**
@@ -32,7 +33,7 @@ export function textosDeConfirmacion(
 ): TextosConfirmacion {
   const info = infoDeEvento(claveEvento);
   const nombre = info?.nombre ?? claveEvento;
-  const emoji = info?.emoji ?? '🗑️';
+  const icono = info?.icono ?? ICONOS.papelera;
   const restante = Math.max(0, cuentaActual - 1);
 
   return {
@@ -43,6 +44,6 @@ export function textosDeConfirmacion(
         : `Pasarías de ${cuentaActual} a ${restante}.`,
     etiquetaConfirmar: 'Sí, quitar',
     etiquetaCancelar: 'Cancelar',
-    emoji,
+    icono,
   };
 }

@@ -7,31 +7,33 @@
  * los viajes existentes.
  */
 
+import { ICONOS, type IconoSpec } from './iconos';
+
 export type EventoInfo = {
   nombre: string;
-  emoji: string;
+  icono: IconoSpec;
 };
 
 export type CategoriaInfo = {
-  emoji: string;
+  icono: IconoSpec;
   eventos: Record<string, EventoInfo>;
 };
 
 export const CATEGORIAS: Record<string, CategoriaInfo> = {
   Gotitas: {
-    emoji: '💧',
+    icono: ICONOS.gota,
     eventos: {
-      cacas: { nombre: 'Cacas', emoji: '💩' },
-      pises: { nombre: 'Pises', emoji: '💧' },
+      cacas: { nombre: 'Cacas', icono: { fuente: 'mci', nombre: 'toilet' } },
+      pises: { nombre: 'Pises', icono: ICONOS.gota },
     },
   },
   Bebidas: {
-    emoji: '🍺',
+    icono: { fuente: 'mci', nombre: 'beer' },
     eventos: {
-      cervezas: { nombre: 'Cerveza', emoji: '🍺' },
-      vinos: { nombre: 'Copa de vino', emoji: '🍷' },
-      vermouths: { nombre: 'Vermouth', emoji: '🍸' },
-      copazos: { nombre: 'Copazo', emoji: '🥃' },
+      cervezas: { nombre: 'Cerveza', icono: { fuente: 'mci', nombre: 'beer' } },
+      vinos: { nombre: 'Copa de vino', icono: { fuente: 'mci', nombre: 'glass-wine' } },
+      vermouths: { nombre: 'Vermouth', icono: { fuente: 'mci', nombre: 'glass-cocktail' } },
+      copazos: { nombre: 'Copazo', icono: { fuente: 'mci', nombre: 'glass-tulip' } },
     },
   },
 };

@@ -18,7 +18,7 @@ describe('textosDeConfirmacion', () => {
     const t = textosDeConfirmacion('cacas', 5);
     expect(t.titulo).toBe('¿Quitar 1 de cacas?');
     expect(t.mensaje).toBe('Pasarías de 5 a 4.');
-    expect(t.emoji).toBe('💩');
+    expect(t.icono).toEqual({ fuente: 'mci', nombre: 'toilet' });
   });
 
   it('avisa distinto cuando la cuenta se queda a cero', () => {
@@ -31,7 +31,7 @@ describe('textosDeConfirmacion', () => {
     // Un viaje viejo puede traer claves que ya no existen en CATEGORIAS.
     const t = textosDeConfirmacion('inventado', 3);
     expect(t.titulo).toBe('¿Quitar 1 de inventado?');
-    expect(t.emoji).toBe('🗑️');
+    expect(t.icono).toEqual({ fuente: 'feather', nombre: 'trash-2' });
   });
 
   it('el botón de cancelar existe siempre y no es el destructivo', () => {

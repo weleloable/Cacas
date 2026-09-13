@@ -104,7 +104,7 @@ describe('Mis viajes', () => {
       renderPantalla();
     });
 
-    expect(screen.getByText('✈️ Crear un viaje')).toBeTruthy();
+    expect(screen.getByText('Crear un viaje')).toBeTruthy();
     expect(screen.getByText('Unirme con un código')).toBeTruthy();
   });
 });

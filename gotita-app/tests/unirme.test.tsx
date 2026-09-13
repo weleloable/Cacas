@@ -144,7 +144,7 @@ describe('unirse a un viaje', () => {
       fireEvent.press(screen.getByText('Buscar y unirme'));
     });
 
-    expect(screen.getByText('¡Dentro de Oktoberfest! 🎉')).toBeTruthy();
+    expect(screen.getByText('¡Dentro de Oktoberfest!')).toBeTruthy();
 
     await act(async () => {
       jest.advanceTimersByTime(700);

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import { useViajes } from '@/lib/viajesContext';
 
@@ -46,13 +47,16 @@ export default function PantallaMisViajes() {
       refreshControl={
         <RefreshControl refreshing={refrescando} onRefresh={alRefrescar} tintColor={tema.acento} />
       }>
-      <Text style={estilos.titulo}>🧳 Mis viajes</Text>
+      <View style={estilos.tituloFila}>
+        <IconoDe spec={ICONOS.maleta} size={24} color={tema.texto} />
+        <Text style={estilos.titulo}>Mis viajes</Text>
+      </View>
 
       {error ? <Text style={estilos.error}>{error}</Text> : null}
 
       {viajes.length === 0 ? (
         <View style={estilos.vacio}>
-          <Text style={estilos.vacioEmoji}>🧳</Text>
+          <IconoDe spec={ICONOS.maleta} size={56} color={tema.textoTenue} />
           <Text style={estilos.vacioTitulo}>Todavía no estás en ningún viaje</Text>
           <Text style={estilos.vacioTexto}>
             Crea uno nuevo, o pide el código a quien lo haya creado y únete.
@@ -84,7 +88,8 @@ export default function PantallaMisViajes() {
 
       <View style={estilos.acciones}>
         <Pressable style={estilos.botonPrincipal} onPress={() => router.push('/crear')}>
-          <Text style={estilos.botonPrincipalTexto}>✈️ Crear un viaje</Text>
+          <IconoDe spec={ICONOS.avion} size={16} color="#04121C" />
+          <Text style={estilos.botonPrincipalTexto}>Crear un viaje</Text>
         </Pressable>
         <Pressable onPress={() => router.push('/unirme')} hitSlop={10}>
           <Text style={estilos.enlace}>Unirme con un código</Text>
@@ -99,6 +104,7 @@ const estilos = StyleSheet.create({
   contenido: { paddingHorizontal: 18 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.fondo },
 
+  tituloFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   titulo: { color: tema.texto, fontSize: 28, fontWeight: '800' },
 
   error: {
@@ -134,7 +140,6 @@ const estilos = StyleSheet.create({
   insigniaTexto: { color: '#04121C', fontSize: 12, fontWeight: '800' },
 
   vacio: { alignItems: 'center', paddingTop: 50, paddingHorizontal: 12 },
-  vacioEmoji: { fontSize: 60 },
   vacioTitulo: {
     color: tema.texto,
     fontSize: 20,
@@ -152,12 +157,15 @@ const estilos = StyleSheet.create({
 
   acciones: { alignItems: 'center', marginTop: 32, gap: 16 },
   botonPrincipal: {
+    flexDirection: 'row',
     backgroundColor: tema.acento,
     borderRadius: radio.md,
     paddingVertical: 16,
     paddingHorizontal: 28,
     alignSelf: 'stretch',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   botonPrincipalTexto: { color: '#04121C', fontSize: 16, fontWeight: '800' },
   enlace: { color: tema.acento, fontSize: 15, fontWeight: '700' },
