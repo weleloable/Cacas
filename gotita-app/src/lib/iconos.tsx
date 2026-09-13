@@ -64,7 +64,7 @@ export function IconoGota({ size = 20, color = '#000' }: PropsTamano) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
         d={PATH_GOTA}
-        stroke={color as string}
+        stroke={color}
         strokeWidth={1.8}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -75,14 +75,21 @@ export function IconoGota({ size = 20, color = '#000' }: PropsTamano) {
 
 /** Dibuja lo que diga `spec`, sea de la fuente que sea. Un único punto de
  * entrada para no repetir el switch en cada pantalla. */
-export function IconoDe({ spec, size = 20, color = '#000' }: { spec: IconoSpec } & PropsTamano) {
+export function IconoDe({
+  spec,
+  size = 20,
+  color = '#000',
+  testID,
+}: { spec: IconoSpec; testID?: string } & PropsTamano) {
   switch (spec.fuente) {
     case 'gota':
       return <IconoGota size={size} color={color} />;
     case 'feather':
-      return <Feather name={spec.nombre} size={size} color={color as string} />;
+      return <Feather name={spec.nombre} size={size} color={color} testID={testID} />;
     case 'mci':
-      return <MaterialCommunityIcons name={spec.nombre} size={size} color={color as string} />;
+      return (
+        <MaterialCommunityIcons name={spec.nombre} size={size} color={color} testID={testID} />
+      );
   }
 }
 

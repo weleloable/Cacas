@@ -9,9 +9,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  View,
 } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
+import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
 import { buscarPorCodigo, unirseAViaje } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
@@ -87,9 +89,14 @@ export default function Unirme() {
         />
 
         {mensaje ? (
-          <Text style={[estilos.mensaje, mensaje.tipo === 'ok' ? estilos.ok : estilos.error]}>
-            {mensaje.texto}
-          </Text>
+          <View style={estilos.mensajeFila}>
+            {mensaje.tipo === 'ok' ? (
+              <IconoDe testID="icono-exito" spec={ICONOS.exito} size={16} color={tema.exito} />
+            ) : null}
+            <Text style={[estilos.mensaje, mensaje.tipo === 'ok' ? estilos.ok : estilos.error]}>
+              {mensaje.texto}
+            </Text>
+          </View>
         ) : null}
 
         <Pressable
@@ -123,7 +130,14 @@ const estilos = StyleSheet.create({
     color: tema.texto,
     textAlign: 'center',
   },
-  mensaje: { fontSize: 15, marginTop: 18, textAlign: 'center', lineHeight: 21 },
+  mensajeFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 18,
+  },
+  mensaje: { fontSize: 15, textAlign: 'center', lineHeight: 21 },
   ok: { color: tema.exito, fontWeight: '700' },
   error: { color: tema.peligro },
   boton: {

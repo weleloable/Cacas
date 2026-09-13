@@ -145,6 +145,8 @@ describe('unirse a un viaje', () => {
     });
 
     expect(screen.getByText('¡Dentro de Oktoberfest!')).toBeTruthy();
+    // El 🎉 de antes no se quitó sin más: lo sustituye un icono de éxito.
+    expect(screen.getByTestId('icono-exito')).toBeTruthy();
 
     await act(async () => {
       jest.advanceTimersByTime(700);
