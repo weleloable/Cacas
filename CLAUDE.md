@@ -36,6 +36,11 @@ Proyecto `jvswgdepktzbzhegugta`. URL: `https://jvswgdepktzbzhegugta.supabase.co`
   políticas en `supabase/politicas-storage-avatars.sql`. **Hay que ejecutar
   ese SQL a mano en el panel** (crea el bucket si no existe); sin él, subir
   una foto da 42501 igual que `viajes` sin sus políticas.
+- Recuperar contraseña necesita, también a mano en el panel (Authentication
+  → URL Configuration): `https://weleloable.github.io/Gotita/restablecer-contrasena`
+  en **Redirect URLs** (si no está, el enlace del email vuelve al Site URL en
+  silencio) y **Site URL** a `https://weleloable.github.io/Gotita`. Detalle
+  completo en `docs/recuperacion.md`.
 
 ### Tabla `viajes`
 

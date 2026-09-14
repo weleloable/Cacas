@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { urlRestablecerContrasena } from './recuperacion';
 import { supabase } from './supabase';
 
 /**
@@ -37,6 +38,18 @@ type AuthContexto = {
    * `user_metadata.avatar_url`. No sube el fichero: eso es aparte, porque
    * subir a Storage no tiene nada que ver con la sesión de auth. */
   actualizarAvatar: (url: string) => Promise<void>;
+  /** Envía el enlace de recuperación a ese correo. Supabase no confirma ni
+   * niega si existe una cuenta con él (no lanza un error distinto en ese
+   * caso): a propósito, para no filtrar qué correos están registrados. */
+  recuperarContrasena: (email: string) => Promise<void>;
+  /** Abre la sesión de recuperación a partir de los tokens que trae el hash
+   * del enlace del email (ver `lib/recuperacion`). Hace falta llamarla a
+   * mano: `detectSessionInUrl` está a `false` en `supabase.ts`, así que la
+   * librería no la abre sola al cargar la pantalla. */
+  iniciarSesionRecuperacion: (accessToken: string, refreshToken: string) => Promise<void>;
+  /** Cambia la contraseña de la sesión activa (la de recuperación, o
+   * cualquier otra). Exige sesión: sin ella Supabase la rechaza. */
+  actualizarContrasena: (password: string) => Promise<void>;
   salir: () => Promise<void>;
 };
 
@@ -101,6 +114,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       actualizarAvatar: async (url) => {
         const { error } = await supabase.auth.updateUser({ data: { avatar_url: url } });
+        if (error) throw error;
+      },
+      recuperarContrasena: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: urlRestablecerContrasena(),
+        });
+        if (error) throw error;
+      },
+      iniciarSesionRecuperacion: async (accessToken, refreshToken) => {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) throw error;
+      },
+      actualizarContrasena: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
       },
       salir: async () => {

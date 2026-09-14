@@ -31,6 +31,10 @@ export default function RootLayout() {
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="unirme" options={{ title: 'Unirse a un viaje' }} />
+            <Stack.Screen
+              name="restablecer-contrasena"
+              options={{ title: 'Nueva contraseña' }}
+            />
           </Stack>
         </ViajesProvider>
       </AuthProvider>

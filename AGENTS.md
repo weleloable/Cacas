@@ -48,6 +48,9 @@ npm run iconos                                # regenera public/iconos (necesita
   armado de 350ms, la revalidación contra servidor.
 - `docs/finalizar-viaje.md` — qué pasa cuando un viaje se cierra, qué sigue
   leyendo/escribiendo sobre viajes finalizados y qué no.
+- `docs/recuperacion.md` — recuperar contraseña: la config manual que exige
+  el panel de Supabase (Redirect URLs, Site URL), por qué hay que leer el
+  hash del enlace a mano, de dónde sale la URL de vuelta.
 - `docs/tests.md` — qué cubre cada fichero de test y por qué existe.
 
 ## Contexto general (rara vez hace falta, pero por si acaso)

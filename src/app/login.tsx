@@ -20,7 +20,7 @@ import { radio, tema } from '@/lib/tema';
 type Modo = 'entrar' | 'registrar';
 
 export default function Login() {
-  const { entrar, registrar } = useAuth();
+  const { entrar, registrar, recuperarContrasena } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [modo, setModo] = useState<Modo>('entrar');
@@ -29,6 +29,16 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  // Aparte de `error` (el del formulario de entrar/crear cuenta): "olvidé mi
+  // contraseña" es una acción distinta con su propio resultado, y mezclarlos
+  // haría que enviar el enlace borrase un error de login a medio escribir, o
+  // al revés.
+  const [avisoRecuperacion, setAvisoRecuperacion] = useState<{
+    tipo: 'ok' | 'error';
+    texto: string;
+  } | null>(null);
+  const [recuperando, setRecuperando] = useState(false);
 
   function cambiarModo(nuevo: Modo) {
     setModo(nuevo);
@@ -64,6 +74,41 @@ export default function Login() {
       setError(e instanceof Error ? e.message : 'No hemos podido continuar. Revisa los datos.');
     } finally {
       setEnviando(false);
+    }
+  }
+
+  /**
+   * Si el email del formulario ya tiene algo, lo usa (pedido explícito: es
+   * el mismo campo). Si está vacío, no llama a nada — pide que se escriba
+   * primero, ahí mismo, en vez de abrir un cuadro de diálogo aparte.
+   *
+   * El aviso de éxito es siempre el mismo texto exista o no esa cuenta:
+   * Supabase no distingue el caso en el resultado (no lanza un error
+   * distinto si el correo no está registrado), así que no hay nada que
+   * filtrar aquí tampoco.
+   */
+  async function alOlvidarContrasena() {
+    const correo = email.trim();
+    if (!correo) {
+      setAvisoRecuperacion({ tipo: 'error', texto: 'Escribe tu email arriba primero.' });
+      return;
+    }
+
+    setRecuperando(true);
+    setAvisoRecuperacion(null);
+    try {
+      await recuperarContrasena(correo);
+      setAvisoRecuperacion({
+        tipo: 'ok',
+        texto: 'Si ese correo está registrado, te hemos enviado un enlace para recuperar tu contraseña.',
+      });
+    } catch (e) {
+      setAvisoRecuperacion({
+        tipo: 'error',
+        texto: e instanceof Error ? e.message : 'No hemos podido enviar el enlace. Inténtalo de nuevo.',
+      });
+    } finally {
+      setRecuperando(false);
     }
   }
 
@@ -170,6 +215,29 @@ export default function Login() {
               </Text>
             )}
           </Pressable>
+
+          {!esRegistro ? (
+            <Pressable
+              style={estilos.enlaceOlvidada}
+              onPress={alOlvidarContrasena}
+              disabled={recuperando}
+              accessibilityRole="button"
+              accessibilityLabel="¿Olvidaste tu contraseña?">
+              <Text style={estilos.enlaceOlvidadaTexto}>
+                {recuperando ? 'Enviando…' : '¿Olvidaste tu contraseña?'}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {avisoRecuperacion ? (
+            <Text
+              style={[
+                estilos.avisoRecuperacion,
+                avisoRecuperacion.tipo === 'ok' ? estilos.avisoRecuperacionOk : estilos.error,
+              ]}>
+              {avisoRecuperacion.texto}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -254,4 +322,11 @@ const estilos = StyleSheet.create({
   },
   botonPulsado: { opacity: 0.75 },
   botonTexto: { color: '#04121C', fontSize: 17, fontWeight: '800' },
+
+  // Sutil a propósito: es un enlace secundario, no otro botón compitiendo
+  // con "Entrar" por la atención.
+  enlaceOlvidada: { alignItems: 'center', marginTop: 16, padding: 4 },
+  enlaceOlvidadaTexto: { color: tema.textoTenue, fontSize: 13, fontWeight: '600' },
+  avisoRecuperacion: { fontSize: 13, textAlign: 'center', marginTop: 10, lineHeight: 18 },
+  avisoRecuperacionOk: { color: tema.exito, fontWeight: '600' },
 });
