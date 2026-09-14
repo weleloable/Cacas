@@ -2,7 +2,7 @@
   "name": "Gotita",
   "short_name": "Gotita",
   "description": "Lo que pasa en el viaje, se cuenta.",
-  "id": "/Cacas/",
+  "id": "/Gotita/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
