@@ -227,7 +227,15 @@ export async function modificarEvento(
   return { ...viaje, usuarios };
 }
 
-/** Total de todos los eventos de un usuario, para la clasificación. */
-export function totalDeUsuario(usuario: UsuarioViaje): number {
-  return Object.values(usuario.eventos ?? {}).reduce((suma, n) => suma + (n ?? 0), 0);
+/**
+ * Total de un usuario, restringido a las claves de evento de UNA categoría.
+ *
+ * La clasificación antes sumaba todos los eventos del viaje en un único
+ * número (cacas + pises + cervezas...), lo que no distingue quién bebe más
+ * de quién caga más. Se pasa a una clasificación por categoría, así que el
+ * total ahora se calcula acotado a las claves de esa categoría, no a todo
+ * `usuario.eventos`.
+ */
+export function totalDeUsuarioEnCategoria(usuario: UsuarioViaje, clavesEventos: string[]): number {
+  return clavesEventos.reduce((suma, clave) => suma + (usuario.eventos?.[clave] ?? 0), 0);
 }

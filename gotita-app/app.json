@@ -39,6 +39,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Gotita necesita acceso a tus fotos para poner una foto de perfil.",
+          "cameraPermission": "Gotita necesita la cámara para hacerte una foto de perfil."
+        }
       ]
     ],
     "experiments": {

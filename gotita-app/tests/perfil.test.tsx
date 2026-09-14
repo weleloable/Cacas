@@ -10,17 +10,27 @@ import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 const USUARIO = '11111111-1111-1111-1111-111111111111';
 
 const mockActualizarNombre = jest.fn();
+const mockActualizarAvatar = jest.fn();
 const mockSalir = jest.fn();
 const mockActualizarNombreEnMisViajes = jest.fn();
 const mockCargarMisViajes = jest.fn();
 const mockReplace = jest.fn();
+const mockElegirDeGaleria = jest.fn();
+const mockHacerFoto = jest.fn();
+const mockSubirAvatar = jest.fn();
+
+// `avatarUrl` mutable porque varios tests necesitan verla cambiar de null a
+// una URL sin volver a montar la pantalla entera.
+const mockAuth = { avatarUrl: null as string | null };
 
 jest.mock('@/lib/auth', () => ({
   useAuth: () => ({
     session: { user: { id: USUARIO, email: 'dudu@example.com' } },
     userId: USUARIO,
     nombreUsuario: 'Dudu',
+    avatarUrl: mockAuth.avatarUrl,
     actualizarNombre: (...args: unknown[]) => mockActualizarNombre(...args),
+    actualizarAvatar: (...args: unknown[]) => mockActualizarAvatar(...args),
     salir: (...args: unknown[]) => mockSalir(...args),
   }),
 }));
@@ -29,6 +39,21 @@ jest.mock('@/lib/viajes', () => ({
   actualizarNombreEnMisViajes: (...args: unknown[]) => mockActualizarNombreEnMisViajes(...args),
   cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
 }));
+
+jest.mock('@/lib/avatar', () => ({
+  elegirDeGaleria: (...args: unknown[]) => mockElegirDeGaleria(...args),
+  hacerFoto: (...args: unknown[]) => mockHacerFoto(...args),
+  subirAvatar: (...args: unknown[]) => mockSubirAvatar(...args),
+}));
+
+// expo-image no aporta nada bajo Jest (no hay red, no hay imagen real que
+// decodificar); un <Image> de react-native basta para comprobar que la URL
+// llega al componente.
+jest.mock('expo-image', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Image } = require('react-native');
+  return { Image };
+});
 
 jest.mock('expo-router', () => ({
   router: { replace: (...args: unknown[]) => mockReplace(...args) },
@@ -64,11 +89,16 @@ function renderPantalla() {
 }
 
 beforeEach(() => {
+  mockAuth.avatarUrl = null;
   mockActualizarNombre.mockReset().mockResolvedValue(undefined);
+  mockActualizarAvatar.mockReset().mockResolvedValue(undefined);
   mockActualizarNombreEnMisViajes.mockReset().mockResolvedValue(undefined);
   mockCargarMisViajes.mockReset().mockResolvedValue([]);
   mockSalir.mockReset().mockResolvedValue(undefined);
   mockReplace.mockReset();
+  mockElegirDeGaleria.mockReset();
+  mockHacerFoto.mockReset();
+  mockSubirAvatar.mockReset().mockResolvedValue('https://ejemplo.test/avatars/foto.jpg');
 });
 
 describe('Perfil', () => {
@@ -190,4 +220,74 @@ describe('Perfil', () => {
     expect(screen.getByText('Gotita v1.0.0')).toBeTruthy();
   });
 
+  describe('foto de perfil', () => {
+    it('sin avatarUrl enseña la inicial, no una foto', async () => {
+      await act(async () => {
+        renderPantalla();
+      });
+
+      expect(screen.getByText('D')).toBeTruthy();
+    });
+
+    it('elegir de galería sube la foto y actualiza la cuenta', async () => {
+      mockElegirDeGaleria.mockResolvedValue('file:///foto.jpg');
+      await act(async () => {
+        renderPantalla();
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Elegir foto de perfil de la galería'));
+      });
+
+      expect(mockElegirDeGaleria).toHaveBeenCalledTimes(1);
+      expect(mockSubirAvatar).toHaveBeenCalledWith(USUARIO, 'file:///foto.jpg');
+      expect(mockActualizarAvatar).toHaveBeenCalledWith('https://ejemplo.test/avatars/foto.jpg');
+      expect(screen.getByText('Foto de perfil actualizada.')).toBeTruthy();
+    });
+
+    it('hacer foto con la cámara sigue el mismo camino que la galería', async () => {
+      mockHacerFoto.mockResolvedValue('file:///camara.jpg');
+      await act(async () => {
+        renderPantalla();
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Hacer una foto de perfil con la cámara'));
+      });
+
+      expect(mockHacerFoto).toHaveBeenCalledTimes(1);
+      expect(mockSubirAvatar).toHaveBeenCalledWith(USUARIO, 'file:///camara.jpg');
+      expect(mockActualizarAvatar).toHaveBeenCalledWith('https://ejemplo.test/avatars/foto.jpg');
+    });
+
+    it('cancelar el selector (uri null) no sube nada ni toca la cuenta', async () => {
+      mockElegirDeGaleria.mockResolvedValue(null);
+      await act(async () => {
+        renderPantalla();
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Elegir foto de perfil de la galería'));
+      });
+
+      expect(mockSubirAvatar).not.toHaveBeenCalled();
+      expect(mockActualizarAvatar).not.toHaveBeenCalled();
+    });
+
+    it('si falla la subida, lo dice y no dice "actualizada"', async () => {
+      mockElegirDeGaleria.mockResolvedValue('file:///foto.jpg');
+      mockSubirAvatar.mockRejectedValue(new Error('bucket no existe'));
+      await act(async () => {
+        renderPantalla();
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Elegir foto de perfil de la galería'));
+      });
+
+      expect(screen.getByText('bucket no existe')).toBeTruthy();
+      expect(mockActualizarAvatar).not.toHaveBeenCalled();
+      expect(screen.queryByText('Foto de perfil actualizada.')).toBeNull();
+    });
+  });
 });

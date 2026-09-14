@@ -40,8 +40,8 @@ jest.mock('@/lib/viajes', () => ({
   cargarMisViajes: (...a: unknown[]) => mockCargarMisViajes(...a),
   buscarPorCodigo: (...a: unknown[]) => mockBuscarPorCodigo(...a),
   unirseAViaje: (...a: unknown[]) => mockUnirseAViaje(...a),
-  totalDeUsuario: (u: { eventos: Record<string, number> }) =>
-    Object.values(u.eventos ?? {}).reduce((a, b) => a + b, 0),
+  totalDeUsuarioEnCategoria: (u: { eventos: Record<string, number> }, claves: string[]) =>
+    claves.reduce((suma, clave) => suma + (u.eventos?.[clave] ?? 0), 0),
 }));
 
 // Objeto estable a propósito: si el mock devolviera `{ user: {...} }` nuevo

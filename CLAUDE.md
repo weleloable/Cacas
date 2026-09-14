@@ -26,6 +26,10 @@ Proyecto `jvswgdepktzbzhegugta`. URL: `https://jvswgdepktzbzhegugta.supabase.co`
 - RLS **activo** en `viajes` con políticas para el rol `authenticated`
   (select / insert / update, sin delete). Están en
   `gotita-app/supabase/politicas-rls.sql`. Sin ellas todo devuelve `[]` o 42501.
+- Bucket de Storage `avatars` (público, para la foto de perfil) con sus
+  políticas en `gotita-app/supabase/politicas-storage-avatars.sql`. **Hay
+  que ejecutar ese SQL a mano en el panel** (crea el bucket si no existe);
+  sin él, subir una foto da 42501 igual que `viajes` sin sus políticas.
 
 ### Tabla `viajes`
 
@@ -60,6 +64,13 @@ Node y gh se instalaron con winget. En PowerShell hace falta recargar el PATH:
   que dos personas a la vez no se sobrescriban.
 - Los códigos de viaje se comprueban contra la tabla antes de asignarse.
 - Interfaz en castellano, incluidos los nombres de variables y funciones.
+- La clasificación es por categoría (Gotitas, Bebidas...), no un total único
+  mezclando cacas con cervezas. `totalDeUsuarioEnCategoria` en
+  `gotita-app/src/lib/viajes.ts` acota la suma a las claves de esa categoría.
+- Foto de perfil: `expo-image-picker` (galería o cámara) sube a Storage
+  (`gotita-app/src/lib/avatar.ts`) y la URL pública se guarda en
+  `user_metadata.avatar_url` (`actualizarAvatar` en `lib/auth.tsx`), igual de
+  copia-no-referencia que ya hace `full_name`.
 
 ## Pendiente
 

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { elegirDeGaleria, hacerFoto, subirAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
 import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
@@ -26,16 +28,43 @@ import { useViajes } from '@/lib/viajesContext';
 const VERSION_APP = Constants.expoConfig?.version ?? '—';
 
 export default function Perfil() {
-  const { session, userId, nombreUsuario, actualizarNombre, salir } = useAuth();
+  const { session, userId, nombreUsuario, avatarUrl, actualizarNombre, actualizarAvatar, salir } =
+    useAuth();
   const { recargar } = useViajes();
   const insets = useSafeAreaInsets();
 
   const [nombre, setNombre] = useState(nombreUsuario);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   const cambiado = nombre.trim().length > 0 && nombre.trim() !== nombreUsuario;
   const inicial = (nombreUsuario.trim()[0] || '?').toUpperCase();
+
+  /**
+   * Común a "elegir de galería" y "hacer foto": lo único que cambia entre
+   * las dos es de dónde sale el `uri` (`origen`). Subir a Storage y guardar
+   * la URL en la cuenta es el mismo paso en los dos casos.
+   */
+  async function alElegirFoto(origen: () => Promise<string | null>) {
+    setMensaje(null);
+    const uri = await origen();
+    if (!uri) return; // canceló el selector o no dio permiso
+
+    setSubiendoFoto(true);
+    try {
+      const url = await subirAvatar(userId, uri);
+      await actualizarAvatar(url);
+      setMensaje({ tipo: 'ok', texto: 'Foto de perfil actualizada.' });
+    } catch (e) {
+      setMensaje({
+        tipo: 'error',
+        texto: e instanceof Error ? e.message : 'No se ha podido subir la foto.',
+      });
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
 
   async function guardar() {
     const limpio = nombre.trim();
@@ -93,7 +122,37 @@ export default function Perfil() {
         </View>
 
         <View style={estilos.avatar}>
-          <Text style={estilos.avatarTexto}>{inicial}</Text>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={estilos.avatarFoto} contentFit="cover" />
+          ) : (
+            <Text style={estilos.avatarTexto}>{inicial}</Text>
+          )}
+          {subiendoFoto ? (
+            <View style={estilos.avatarCargando}>
+              <ActivityIndicator color={tema.acento} />
+            </View>
+          ) : null}
+        </View>
+
+        <View style={estilos.filaFoto}>
+          <Pressable
+            style={({ pressed }) => [estilos.botonFoto, pressed && estilos.pulsado]}
+            onPress={() => alElegirFoto(elegirDeGaleria)}
+            disabled={subiendoFoto}
+            accessibilityRole="button"
+            accessibilityLabel="Elegir foto de perfil de la galería">
+            <IconoDe spec={ICONOS.imagen} size={16} color={tema.acento} />
+            <Text style={estilos.botonFotoTexto}>Galería</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [estilos.botonFoto, pressed && estilos.pulsado]}
+            onPress={() => alElegirFoto(hacerFoto)}
+            disabled={subiendoFoto}
+            accessibilityRole="button"
+            accessibilityLabel="Hacer una foto de perfil con la cámara">
+            <IconoDe spec={ICONOS.camara} size={16} color={tema.acento} />
+            <Text style={estilos.botonFotoTexto}>Cámara</Text>
+          </Pressable>
         </View>
 
         <Text style={estilos.etiqueta}>Nombre</Text>
@@ -163,8 +222,34 @@ const estilos = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 24,
     marginBottom: 8,
+    overflow: 'hidden',
   },
   avatarTexto: { color: tema.acento, fontSize: 34, fontWeight: '800' },
+  avatarFoto: { width: '100%', height: '100%' },
+  avatarCargando: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(11,16,32,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  filaFoto: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 8 },
+  botonFoto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: tema.tarjeta,
+    borderWidth: 1,
+    borderColor: tema.borde,
+    borderRadius: radio.md,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  botonFotoTexto: { color: tema.acento, fontSize: 13, fontWeight: '700' },
 
   etiqueta: { color: tema.textoTenue, fontSize: 13, fontWeight: '600', marginBottom: 8, marginLeft: 4, marginTop: 24 },
   etiquetaSeparada: { marginTop: 20 },

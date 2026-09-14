@@ -15,10 +15,11 @@ import { AvisoInstalar } from '@/componentes/AvisoInstalar';
 import { DialogoConfirmar } from '@/componentes/DialogoConfirmar';
 import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
+import { compartirCodigo, copiarCodigo } from '@/lib/compartir';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
 import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
-import { ConflictoDeConcurrencia, modificarEvento, totalDeUsuario } from '@/lib/viajes';
+import { ConflictoDeConcurrencia, modificarEvento, totalDeUsuarioEnCategoria } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
 
 /**
@@ -34,11 +35,39 @@ export default function PantallaViaje() {
   const [refrescando, setRefrescando] = useState(false);
   // Evento pendiente de confirmar al restar. null = no hay diálogo abierto.
   const [porRestar, setPorRestar] = useState<{ clave: string; cuenta: number } | null>(null);
+  // Aviso corto tras copiar o compartir el código ("Código copiado"). null =
+  // no hay nada que enseñar.
+  const [avisoCodigo, setAvisoCodigo] = useState<string | null>(null);
 
   // Las escrituras van en fila india: si pulsas 💩 cinco veces seguidas, cada
   // guardado espera al anterior en vez de leer todos la misma cuenta vieja.
   const cola = useRef<Promise<unknown>>(Promise.resolve());
   const scroll = useRef<ScrollView>(null);
+  const avisoCodigoTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avisoCodigoTimeout.current) clearTimeout(avisoCodigoTimeout.current);
+    };
+  }, []);
+
+  function mostrarAvisoCodigo(texto: string) {
+    setAvisoCodigo(texto);
+    if (avisoCodigoTimeout.current) clearTimeout(avisoCodigoTimeout.current);
+    avisoCodigoTimeout.current = setTimeout(() => setAvisoCodigo(null), 2000);
+  }
+
+  async function alPulsarCodigo() {
+    if (!viaje) return;
+    await copiarCodigo(viaje.codigo);
+    mostrarAvisoCodigo('Código copiado');
+  }
+
+  async function alCompartirCodigo() {
+    if (!viaje) return;
+    const resultado = await compartirCodigo(viaje.nombre, viaje.codigo);
+    if (resultado === 'copiado') mostrarAvisoCodigo('Código copiado');
+  }
 
   /** Sube al principio, que es donde vive el aviso de error. Sin esto, un
    * error al confirmar una resta (el − suele estar lejos del principio, al
@@ -173,10 +202,24 @@ export default function PantallaViaje() {
   }
 
   const misEventos = viaje?.usuarios?.[userId]?.eventos ?? {};
-  const clasificacion = viaje
-    ? Object.entries(viaje.usuarios ?? {})
-        .map(([clave, usuario]) => ({ clave, nombre: usuario.nombre, total: totalDeUsuario(usuario) }))
-        .sort((a, b) => b.total - a.total)
+  // Una clasificación por categoría (Gotitas, Bebidas...), no un único total
+  // que mezcla cacas con cervezas.
+  const clasificacionPorCategoria = viaje
+    ? (viaje.categorias ?? [])
+        .map((nombreCategoria) => {
+          const categoria = CATEGORIAS[nombreCategoria];
+          if (!categoria) return null;
+          const clavesEventos = Object.keys(categoria.eventos);
+          const filas = Object.entries(viaje.usuarios ?? {})
+            .map(([clave, usuario]) => ({
+              clave,
+              nombre: usuario.nombre,
+              total: totalDeUsuarioEnCategoria(usuario, clavesEventos),
+            }))
+            .sort((a, b) => b.total - a.total);
+          return { nombreCategoria, icono: categoria.icono, filas };
+        })
+        .filter((entrada): entrada is NonNullable<typeof entrada> => entrada !== null)
     : [];
 
   return (
@@ -266,26 +309,46 @@ export default function PantallaViaje() {
             );
           })}
 
-          <View style={estilos.seccion}>
-            <View style={estilos.tituloSeccionFila}>
-              <IconoDe spec={ICONOS.trofeo} size={18} color={tema.texto} />
-              <Text style={estilos.tituloSeccion}>Clasificación</Text>
-            </View>
-            {clasificacion.map((fila, indice) => (
-              <View key={fila.clave} style={estilos.filaRanking}>
-                <Text style={estilos.puesto}>{indice + 1}</Text>
-                <Text
-                  style={[estilos.nombreRanking, fila.clave === userId && estilos.nombreRankingYo]}
-                  numberOfLines={1}>
-                  {fila.nombre}
-                </Text>
-                <Text style={estilos.totalRanking}>{fila.total}</Text>
+          {clasificacionPorCategoria.map(({ nombreCategoria, icono, filas }) => (
+            <View key={nombreCategoria} style={estilos.seccion}>
+              <View style={estilos.tituloSeccionFila}>
+                <IconoDe spec={ICONOS.trofeo} size={18} color={tema.texto} />
+                <Text style={estilos.tituloSeccion}>Clasificación · {nombreCategoria}</Text>
+                <IconoDe spec={icono} size={16} color={tema.textoTenue} />
               </View>
-            ))}
-          </View>
+              {filas.map((fila, indice) => (
+                <View key={fila.clave} style={estilos.filaRanking}>
+                  <Text style={estilos.puesto}>{indice + 1}</Text>
+                  <Text
+                    style={[estilos.nombreRanking, fila.clave === userId && estilos.nombreRankingYo]}
+                    numberOfLines={1}>
+                    {fila.nombre}
+                  </Text>
+                  <Text style={estilos.totalRanking}>{fila.total}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
 
           <View style={estilos.pie}>
-            <Text style={estilos.codigo}>Código del viaje: {viaje.codigo}</Text>
+            <View style={estilos.filaCodigo}>
+              <Pressable
+                onPress={alPulsarCodigo}
+                accessibilityRole="button"
+                accessibilityLabel="Copiar código del viaje"
+                hitSlop={8}>
+                <Text style={estilos.codigo}>Código del viaje: {viaje.codigo}</Text>
+              </Pressable>
+              <Pressable
+                onPress={alCompartirCodigo}
+                accessibilityRole="button"
+                accessibilityLabel="Compartir código del viaje"
+                hitSlop={8}
+                style={estilos.botonCompartirCodigo}>
+                <IconoDe spec={ICONOS.compartir} size={16} color={tema.textoTenue} />
+              </Pressable>
+            </View>
+            {avisoCodigo ? <Text style={estilos.avisoCodigo}>{avisoCodigo}</Text> : null}
           </View>
         </>
       )}
@@ -418,6 +481,9 @@ const estilos = StyleSheet.create({
   botonPrincipalTexto: { color: '#04121C', fontSize: 16, fontWeight: '800' },
   enlaceVacio: { color: tema.acento, fontSize: 15, fontWeight: '700', marginTop: 22 },
 
-  pie: { marginTop: 36, alignItems: 'center', gap: 12 },
+  pie: { marginTop: 36, alignItems: 'center', gap: 8 },
+  filaCodigo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   codigo: { color: tema.textoTenue, fontSize: 14, letterSpacing: 0.5 },
+  botonCompartirCodigo: { padding: 4 },
+  avisoCodigo: { color: tema.acento, fontSize: 13, fontWeight: '700' },
 });

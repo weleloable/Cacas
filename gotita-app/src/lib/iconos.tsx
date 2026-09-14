@@ -107,4 +107,7 @@ export const ICONOS = {
   entrar: { fuente: 'feather', nombre: 'log-in' } as IconoSpec,
   crearCuenta: { fuente: 'feather', nombre: 'user-plus' } as IconoSpec,
   papelera: { fuente: 'feather', nombre: 'trash-2' } as IconoSpec,
+  compartir: { fuente: 'feather', nombre: 'share-2' } as IconoSpec,
+  camara: { fuente: 'feather', nombre: 'camera' } as IconoSpec,
+  imagen: { fuente: 'feather', nombre: 'image' } as IconoSpec,
 } satisfies Record<string, IconoSpec>;

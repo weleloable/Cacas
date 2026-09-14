@@ -28,6 +28,8 @@ const viajeBase = {
 // referenciar variables cuyo nombre empiece por `mock`.
 const mockCargarMisViajes = jest.fn();
 const mockModificarEvento = jest.fn();
+const mockCopiarCodigo = jest.fn();
+const mockCompartirCodigo = jest.fn();
 
 // viaje.tsx hace `e instanceof ConflictoDeConcurrencia`, así que el mock del
 // módulo tiene que exportar y lanzar la misma clase o ese `catch` nunca entra.
@@ -44,10 +46,15 @@ jest.mock('@/lib/viajes', () => {
     cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
     modificarEvento: (...args: unknown[]) => mockModificarEvento(...args),
     ConflictoDeConcurrencia,
-    totalDeUsuario: (u: { eventos: Record<string, number> }) =>
-      Object.values(u.eventos ?? {}).reduce((a, b) => a + b, 0),
+    totalDeUsuarioEnCategoria: (u: { eventos: Record<string, number> }, claves: string[]) =>
+      claves.reduce((suma, clave) => suma + (u.eventos?.[clave] ?? 0), 0),
   };
 });
+
+jest.mock('@/lib/compartir', () => ({
+  copiarCodigo: (...args: unknown[]) => mockCopiarCodigo(...args),
+  compartirCodigo: (...args: unknown[]) => mockCompartirCodigo(...args),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ConflictoDeConcurrencia } = require('@/lib/viajes');
@@ -159,6 +166,8 @@ beforeEach(() => {
   mockSesion.valor = { user: { id: USUARIO } };
   mockCargarMisViajes.mockReset().mockResolvedValue([viajeBase]);
   mockModificarEvento.mockReset();
+  mockCopiarCodigo.mockReset().mockResolvedValue(undefined);
+  mockCompartirCodigo.mockReset().mockResolvedValue('compartido');
   servidorDeMentira(3);
 });
 
@@ -286,5 +295,83 @@ describe('botón − de la pantalla de viaje', () => {
     await pulsar(screen.getByLabelText('Sí, quitar'));
 
     expect(screen.getByText('Fallo de red simulado')).toBeTruthy();
+  });
+});
+
+describe('código del viaje: copiar y compartir', () => {
+  it('pulsar el código lo copia y enseña un aviso', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Copiar código del viaje'));
+
+    expect(mockCopiarCodigo).toHaveBeenCalledWith('ABC-123');
+    expect(screen.getByText('Código copiado')).toBeTruthy();
+  });
+
+  it('el aviso desaparece pasado un tiempo', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Copiar código del viaje'));
+    expect(screen.getByText('Código copiado')).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2100);
+    });
+
+    expect(screen.queryByText('Código copiado')).toBeNull();
+  });
+
+  it('el botón de compartir llama a compartirCodigo con el nombre y el código', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Compartir código del viaje'));
+
+    expect(mockCompartirCodigo).toHaveBeenCalledWith('Cangas', 'ABC-123');
+  });
+
+  it('si compartir cae al fallback de copiar (web sin Web Share API), también avisa', async () => {
+    mockCompartirCodigo.mockResolvedValue('copiado');
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Compartir código del viaje'));
+
+    expect(screen.getByText('Código copiado')).toBeTruthy();
+  });
+
+  it('si el usuario cancela el panel de compartir, no hay ningún aviso falso', async () => {
+    mockCompartirCodigo.mockResolvedValue('cancelado');
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Compartir código del viaje'));
+
+    expect(screen.queryByText('Código copiado')).toBeNull();
+  });
+});
+
+describe('clasificación por categoría', () => {
+  it('separa la clasificación por cada categoría del viaje, no un total mezclado', async () => {
+    mockCargarMisViajes.mockResolvedValue([
+      {
+        ...viajeBase,
+        categorias: ['Gotitas', 'Bebidas'],
+        usuarios: {
+          [USUARIO]: {
+            nombre: 'Dudu',
+            eventos: { cacas: 3, pises: 1, cervezas: 5, vinos: 0, vermouths: 0, copazos: 0 },
+          },
+          OTRO: { nombre: 'Rodri', eventos: { cacas: 0, pises: 0, cervezas: 9 } },
+        },
+      },
+    ]);
+    await renderPantalla();
+
+    expect(screen.getByText('Clasificación · Gotitas')).toBeTruthy();
+    expect(screen.getByText('Clasificación · Bebidas')).toBeTruthy();
+
+    // Dudu manda en Gotitas (3+1=4 contra 0 de Rodri)...
+    expect(screen.getByText('4')).toBeTruthy();
+    // ...pero Rodri manda en Bebidas (9 contra el 5 de Dudu), justo lo que un
+    // total único mezclado no distinguiría.
+    expect(screen.getByText('9')).toBeTruthy();
   });
 });

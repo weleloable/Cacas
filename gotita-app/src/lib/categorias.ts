@@ -23,7 +23,7 @@ export const CATEGORIAS: Record<string, CategoriaInfo> = {
   Gotitas: {
     icono: ICONOS.gota,
     eventos: {
-      cacas: { nombre: 'Cacas', icono: { fuente: 'mci', nombre: 'toilet' } },
+      cacas: { nombre: 'Cacas', icono: { fuente: 'mci', nombre: 'emoticon-poop' } },
       pises: { nombre: 'Pises', icono: ICONOS.gota },
     },
   },

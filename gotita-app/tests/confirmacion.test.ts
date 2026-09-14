@@ -18,7 +18,7 @@ describe('textosDeConfirmacion', () => {
     const t = textosDeConfirmacion('cacas', 5);
     expect(t.titulo).toBe('¿Quitar 1 de cacas?');
     expect(t.mensaje).toBe('Pasarías de 5 a 4.');
-    expect(t.icono).toEqual({ fuente: 'mci', nombre: 'toilet' });
+    expect(t.icono).toEqual({ fuente: 'mci', nombre: 'emoticon-poop' });
   });
 
   it('avisa distinto cuando la cuenta se queda a cero', () => {

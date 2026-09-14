@@ -24,6 +24,8 @@ type AuthContexto = {
   userId: string;
   /** Sólo para pintar en pantalla. */
   nombreUsuario: string;
+  /** URL pública de la foto de perfil (bucket `avatars`), o null si no hay. */
+  avatarUrl: string | null;
   cargando: boolean;
   entrar: (email: string, password: string) => Promise<void>;
   registrar: (email: string, password: string, nombre: string) => Promise<void>;
@@ -31,6 +33,10 @@ type AuthContexto = {
    * los viajes ya existentes: eso lo hace `actualizarNombreEnMisViajes` de
    * `lib/viajes`, aparte, porque el nombre de cada viaje es una copia propia. */
   actualizarNombre: (nombre: string) => Promise<void>;
+  /** Guarda la URL de la foto ya subida (`lib/avatar.subirAvatar`) en
+   * `user_metadata.avatar_url`. No sube el fichero: eso es aparte, porque
+   * subir a Storage no tiene nada que ver con la sesión de auth. */
+  actualizarAvatar: (url: string) => Promise<void>;
   salir: () => Promise<void>;
 };
 
@@ -60,6 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       userId: session?.user?.id ?? '',
       nombreUsuario: nombreDeUsuario(session?.user),
+      avatarUrl:
+        typeof session?.user?.user_metadata?.avatar_url === 'string'
+          ? session.user.user_metadata.avatar_url
+          : null,
       cargando,
       entrar: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -87,6 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       actualizarNombre: async (nombre) => {
         const { error } = await supabase.auth.updateUser({ data: { full_name: nombre } });
+        if (error) throw error;
+      },
+      actualizarAvatar: async (url) => {
+        const { error } = await supabase.auth.updateUser({ data: { avatar_url: url } });
         if (error) throw error;
       },
       salir: async () => {
