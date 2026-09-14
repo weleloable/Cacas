@@ -122,9 +122,9 @@ export default function Login() {
         contentContainerStyle={[estilos.contenido, { paddingTop: insets.top + 40 }]}
         keyboardShouldPersistTaps="handled">
         <View style={estilos.logo}>
-          <IconoDe spec={ICONOS.gota} size={40} color={tema.acento} />
+          <IconoDe spec={ICONOS.gota} size={80} color={tema.acento} />
         </View>
-        <Text style={estilos.titulo}>Gotita</Text>
+        <Text style={estilos.titulo}>GOTITA</Text>
         <Text style={estilos.subtitulo}>Lo que pasa en el viaje, se cuenta.</Text>
 
         <View style={estilos.pestanas}>
@@ -248,9 +248,12 @@ const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.fondo },
   contenido: { paddingHorizontal: 24, paddingBottom: 40 },
   logo: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    // Círculo proporcional al doble del icono (antes 76 para un icono de
+    // 40): mismo margen relativo alrededor de la gota, no un icono de 80
+    // recortado dentro de un círculo pensado para uno de 40.
+    width: 152,
+    height: 152,
+    borderRadius: 76,
     backgroundColor: tema.tarjeta,
     borderWidth: 1,
     borderColor: tema.borde,
@@ -258,7 +261,7 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
   },
-  titulo: { fontSize: 36, fontWeight: '800', color: tema.texto, textAlign: 'center', marginTop: 6 },
+  titulo: { fontSize: 18, fontWeight: '800', color: tema.texto, textAlign: 'center', marginTop: 6 },
   subtitulo: {
     fontSize: 15,
     color: tema.textoTenue,
