@@ -2,7 +2,7 @@
 # Publica el build web en la rama gh-pages, que es lo que sirve
 # https://weleloable.github.io/Gotita/
 #
-# Uso, desde gotita-app/:   npm run publicar
+# Uso, desde la raíz del repo:   npm run publicar
 #
 # Se hace con un worktree temporal en vez de cambiando de rama, porque cambiar
 # de rama mueve los ficheros del directorio en el que estás trabajando.
