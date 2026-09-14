@@ -249,7 +249,7 @@ describe('botón − de la pantalla de viaje', () => {
   it('el − está deshabilitado a 0, y no abre nada', async () => {
     await renderPantalla();
 
-    await pulsar(screen.getByLabelText('Quitar uno de Pises')); // está a 0
+    await pulsar(screen.getByLabelText('Quitar uno de Gotitas')); // está a 0
     expect(screen.queryByText('¿Quitar 1 de pises?')).toBeNull();
     expect(mockModificarEvento).not.toHaveBeenCalled();
   });
@@ -351,38 +351,81 @@ describe('clasificación por categoría, con subclasificación por evento', () =
     return [{ ...viajeBase, categorias: ['Gotitas', 'Bebidas'], usuarios }];
   }
 
-  it('separa la clasificación por categoría Y por cada evento dentro de ella', async () => {
-    mockCargarMisViajes.mockResolvedValue(
-      viajeConDosUsuarios({
-        [USUARIO]: {
-          nombre: 'Dudu',
-          eventos: { cacas: 3, pises: 1, cervezas: 5, vinos: 0, vermouths: 0, copazos: 0 },
-        },
-        OTRO: {
-          nombre: 'Rodri',
-          eventos: { cacas: 0, pises: 0, cervezas: 9, vinos: 0, vermouths: 1, copazos: 0 },
-        },
-      })
-    );
+  const VIAJE_DOS_USUARIOS = {
+    [USUARIO]: {
+      nombre: 'Dudu',
+      eventos: { cacas: 3, pises: 1, cervezas: 5, vinos: 0, vermouths: 0, copazos: 0 },
+    },
+    OTRO: {
+      nombre: 'Rodri',
+      eventos: { cacas: 0, pises: 0, cervezas: 9, vinos: 0, vermouths: 1, copazos: 0 },
+    },
+  };
+
+  it('la clasificación entera está cerrada de entrada, en sus tres niveles', async () => {
+    mockCargarMisViajes.mockResolvedValue(viajeConDosUsuarios(VIAJE_DOS_USUARIOS));
     await renderPantalla();
 
-    // Un encabezado por categoría...
-    expect(screen.getByText('Clasificación · Gotitas')).toBeTruthy();
-    expect(screen.getByText('Clasificación · Bebidas')).toBeTruthy();
-    // ...y una subclasificación por cada evento de esa categoría, no un total
-    // que mezcle cacas con pises o cerveza con vermú. Cada nombre de evento
-    // aparece dos veces: la tarjeta de contador de arriba y el título de su
-    // subclasificación.
-    for (const nombreEvento of ['Cacas', 'Pises', 'Cerveza', 'Copa de vino', 'Vermouth', 'Copazo']) {
-      expect(screen.getAllByText(nombreEvento).length).toBe(2);
-    }
+    // El encabezado existe (cerrado)...
+    expect(
+      screen.getByLabelText('Abrir Clasificación').props.accessibilityState.expanded
+    ).toBe(false);
+    // ...pero nada de lo que hay dentro se ve: ni las categorías, ni los
+    // eventos, ni un número que sólo puede venir de una fila de
+    // clasificación ("9" es el total de Rodri en cerveza; el contador de
+    // arriba sólo enseña los propios, nunca los de otro usuario).
+    expect(screen.queryByLabelText('Abrir clasificación de Bebidas')).toBeNull();
+    expect(screen.queryByLabelText('Abrir clasificación de Cerveza en Bebidas')).toBeNull();
+    expect(screen.queryByText('9')).toBeNull();
+  });
 
-    // Dudu manda en Cacas (3 contra 0), pero Rodri manda en Cerveza (9 contra
-    // 5 de Dudu): sólo se comprueba que "9" existe (aparece una sola vez, a
-    // diferencia de "3" que también es el contador de arriba), justo lo que
-    // una clasificación por categoría (que sumaría cerveza+vino+vermú+copazo)
-    // no distinguiría evento a evento.
+  it('desplegar la sección enseña las categorías, no todavía sus eventos', async () => {
+    mockCargarMisViajes.mockResolvedValue(viajeConDosUsuarios(VIAJE_DOS_USUARIOS));
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Abrir Clasificación'));
+
+    expect(screen.getByLabelText('Abrir clasificación de Gotitas')).toBeTruthy();
+    expect(screen.getByLabelText('Abrir clasificación de Bebidas')).toBeTruthy();
+    // Las categorías ya se ven, pero sus eventos (y la clasificación en sí)
+    // todavía no: es un desplegable dentro de otro, no todo de golpe.
+    expect(screen.queryByLabelText('Abrir clasificación de Cerveza en Bebidas')).toBeNull();
+    expect(screen.queryByText('9')).toBeNull();
+  });
+
+  it('desplegar una categoría enseña sus eventos, no todavía la clasificación', async () => {
+    mockCargarMisViajes.mockResolvedValue(viajeConDosUsuarios(VIAJE_DOS_USUARIOS));
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Abrir Clasificación'));
+    await pulsar(screen.getByLabelText('Abrir clasificación de Bebidas'));
+
+    for (const nombreEvento of ['Cerveza', 'Copa de vino', 'Vermouth', 'Copazo']) {
+      expect(screen.getByLabelText(`Abrir clasificación de ${nombreEvento} en Bebidas`)).toBeTruthy();
+    }
+    // La otra categoría sigue cerrada: abrir una no abre las demás.
+    expect(screen.queryByLabelText('Abrir clasificación de Cacas en Gotitas')).toBeNull();
+    // Y el evento en sí, aunque ya se ve su cabecera, sigue sin enseñar la
+    // clasificación de usuarios.
+    expect(screen.queryByText('9')).toBeNull();
+  });
+
+  it('desplegar un evento, por fin, enseña la clasificación de usuarios de ese punto', async () => {
+    mockCargarMisViajes.mockResolvedValue(viajeConDosUsuarios(VIAJE_DOS_USUARIOS));
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Abrir Clasificación'));
+    await pulsar(screen.getByLabelText('Abrir clasificación de Bebidas'));
+    await pulsar(screen.getByLabelText('Abrir clasificación de Cerveza en Bebidas'));
+
+    // Rodri manda en Cerveza (9 contra el 5 de Dudu), justo lo que una
+    // clasificación por categoría (que sumaría cerveza+vino+vermú+copazo) no
+    // distinguiría evento a evento.
     expect(screen.getByText('9')).toBeTruthy();
+    expect(screen.getByText('Rodri')).toBeTruthy();
+    // El evento hermano (Vermouth) sigue con su cabecera visible pero sin
+    // desplegar su propia clasificación: abrir uno no abre los demás.
+    expect(screen.getByLabelText('Abrir clasificación de Vermouth en Bebidas')).toBeTruthy();
   });
 
   it('enseña la foto de quien la tiene y la inicial de quien no', async () => {
@@ -397,6 +440,10 @@ describe('clasificación por categoría, con subclasificación por evento', () =
       })
     );
     await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Abrir Clasificación'));
+    await pulsar(screen.getByLabelText('Abrir clasificación de Gotitas'));
+    await pulsar(screen.getByLabelText('Abrir clasificación de Cacas en Gotitas'));
 
     // Rodri no tiene avatarUrl: cae a la inicial.
     expect(screen.getAllByText('R').length).toBeGreaterThan(0);

@@ -64,13 +64,33 @@ Node y gh se instalaron con winget. En PowerShell hace falta recargar el PATH:
   que dos personas a la vez no se sobrescriban.
 - Los códigos de viaje se comprueban contra la tabla antes de asignarse.
 - Interfaz en castellano, incluidos los nombres de variables y funciones.
-- La clasificación es por categoría (Gotitas, Bebidas...), no un total único
-  mezclando cacas con cervezas. `totalDeUsuarioEnCategoria` en
-  `gotita-app/src/lib/viajes.ts` acota la suma a las claves de esa categoría.
+- La clasificación es una subclasificación por CADA EVENTO (Cacas, Gotitas,
+  Cerveza, Copa de vino, Vermouth, Copazo), agrupadas bajo su categoría
+  (Gotitas, Bebidas), no un total por categoría (mezclaría cacas con pises) ni
+  un total único (mezclaría cacas con cervezas). Desplegable en sus tres
+  niveles (sección entera / categoría / evento), cerrado por defecto en los
+  tres: pedido explícito para que un primer vistazo a "Mi Viaje" no enseñe ya
+  resultados de nadie. `gotita-app/src/componentes/Desplegable.tsx` es la
+  cabecera pulsable reusada en los tres niveles (estado no controlado, lo
+  lleva `viaje.tsx` en tres `Record<string, boolean>`).
+- El evento `pises` se ENSEÑA como "Gotitas" (mismo nombre que su categoría,
+  pedido explícito, no un descuido) pero su CLAVE interna sigue siendo
+  `pises` — ya está guardada así en el JSON `usuarios` de Supabase, renombrar
+  la clave exigiría migrar datos.
 - Foto de perfil: `expo-image-picker` (galería o cámara) sube a Storage
   (`gotita-app/src/lib/avatar.ts`) y la URL pública se guarda en
   `user_metadata.avatar_url` (`actualizarAvatar` en `lib/auth.tsx`), igual de
-  copia-no-referencia que ya hace `full_name`.
+  copia-no-referencia que ya hace `full_name`. Esa copia (`avatarUrl` dentro
+  de `usuarios[userId]` en cada viaje) es la que pinta la foto al lado del
+  nombre en la clasificación, y sólo se escribe cuando alguien SUBE una foto
+  — quien ya tenía cuenta y foto de antes de que esa propagación existiera se
+  quedaría con viajes sin la copia para siempre. `ViajesProvider.recargar()`
+  (`gotita-app/src/lib/viajesContext.tsx`) se autocorrige: si la cuenta ya
+  tiene foto y algún viaje activo no la refleja, la propaga sola, sin que el
+  usuario tenga que volver a subir la misma foto sólo para "tocar" el guardado.
+- **Toda actualización sube la versión de la app** (ver
+  "Comandos" → nota de `expoConfig.version` en el CLAUDE.md de `gotita-app/`):
+  hábito permanente para las tareas que vengan, no sólo para esta.
 
 ## Pendiente
 

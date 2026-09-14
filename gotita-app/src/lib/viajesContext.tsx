@@ -11,7 +11,7 @@ import {
 } from 'react';
 
 import { useAuth } from './auth';
-import { cargarMisViajes, type Viaje } from './viajes';
+import { actualizarAvatarEnMisViajes, cargarMisViajes, type Viaje } from './viajes';
 
 type ViajesContextoValor = {
   viajes: Viaje[];
@@ -53,7 +53,7 @@ const Contexto = createContext<ViajesContextoValor | null>(null);
  * los viajes de quien usó la app justo antes.
  */
 export function ViajesProvider({ children }: { children: ReactNode }) {
-  const { userId, session } = useAuth();
+  const { userId, session, avatarUrl } = useAuth();
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [viajeActivoId, setViajeActivoIdInterno] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -74,8 +74,35 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
       if (!userId) return;
       const miId = ++idPeticion.current;
       try {
-        const mios = await cargarMisViajes(userId);
+        let mios = await cargarMisViajes(userId);
         if (idPeticion.current !== miId) return; // superada mientras estaba en vuelo
+
+        // Autocorrección de la foto de perfil: `avatarUrl` es una copia por
+        // viaje (ver el comentario en `UsuarioViaje`), y esa copia sólo se
+        // escribe cuando alguien SUBE una foto (`actualizarAvatarEnMisViajes`
+        // desde Perfil). Quien ya tenía cuenta y foto de antes de que esa
+        // propagación existiera —o quien fue invitado a un viaje antes de
+        // subir su primera foto— se queda con viajes sin la copia para
+        // siempre, salvo que vuelva a tocar el botón de subir sólo para
+        // "reactivar" el guardado. Aquí se repara solo: si la cuenta ya
+        // tiene foto y algún viaje activo no la refleja, se propaga y se
+        // recarga, sin que el usuario tenga que hacer nada.
+        if (avatarUrl) {
+          const desincronizado = mios.some(
+            (v) => v.usuarios?.[userId] && v.usuarios[userId].avatarUrl !== avatarUrl
+          );
+          if (desincronizado) {
+            await actualizarAvatarEnMisViajes(userId, avatarUrl).catch(() => {
+              // Best-effort: si falla (red, RLS...), se sigue con lo que ya
+              // se tenía. La próxima recarga (pull-to-refresh, TOKEN_REFRESHED)
+              // lo volverá a intentar.
+            });
+            if (idPeticion.current !== miId) return;
+            mios = await cargarMisViajes(userId);
+            if (idPeticion.current !== miId) return;
+          }
+        }
+
         setViajes(mios);
         setViajeActivoIdInterno((actual) =>
           actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
@@ -88,7 +115,7 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [userId]
+    [userId, avatarUrl]
   );
 
   // `session` como dependencia, no sólo al montar: Supabase dispara

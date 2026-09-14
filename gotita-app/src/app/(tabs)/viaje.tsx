@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvisoInstalar } from '@/componentes/AvisoInstalar';
 import { DialogoConfirmar } from '@/componentes/DialogoConfirmar';
+import { Desplegable } from '@/componentes/Desplegable';
 import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
 import { compartirCodigo, copiarCodigo } from '@/lib/compartir';
@@ -39,6 +40,24 @@ export default function PantallaViaje() {
   // Aviso corto tras copiar o compartir el código ("Código copiado"). null =
   // no hay nada que enseñar.
   const [avisoCodigo, setAvisoCodigo] = useState<string | null>(null);
+
+  // Clasificación cerrada por defecto en sus tres niveles (la sección
+  // entera, cada categoría, cada evento dentro de ella): que un primer
+  // vistazo a "Mi Viaje" no enseñe ya los resultados de nadie, pedido
+  // explícito. `categoriasAbiertas`/`eventosAbiertos` son mapas, no un único
+  // "cuál está abierto": varias categorías (o varios eventos) pueden estar
+  // desplegados a la vez.
+  const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState<Record<string, boolean>>({});
+  const [eventosAbiertos, setEventosAbiertos] = useState<Record<string, boolean>>({});
+
+  function alternarCategoria(nombreCategoria: string) {
+    setCategoriasAbiertas((previas) => ({ ...previas, [nombreCategoria]: !previas[nombreCategoria] }));
+  }
+
+  function alternarEvento(claveGlobal: string) {
+    setEventosAbiertos((previos) => ({ ...previos, [claveGlobal]: !previos[claveGlobal] }));
+  }
 
   // Las escrituras van en fila india: si pulsas 💩 cinco veces seguidas, cada
   // guardado espera al anterior en vez de leer todos la misma cuenta vieja.
@@ -314,50 +333,82 @@ export default function PantallaViaje() {
             );
           })}
 
-          {clasificacionPorCategoria.map(({ nombreCategoria, icono, eventos }) => (
-            <View key={nombreCategoria} style={estilos.seccion}>
-              <View style={estilos.tituloSeccionFila}>
-                <IconoDe spec={ICONOS.trofeo} size={18} color={tema.texto} />
-                <Text style={estilos.tituloSeccion}>Clasificación · {nombreCategoria}</Text>
-                <IconoDe spec={icono} size={16} color={tema.textoTenue} />
-              </View>
-              {eventos.map(({ claveEvento, nombreEvento, iconoEvento, filas }) => (
-                <View key={claveEvento} style={estilos.subseccion}>
-                  <View style={estilos.tituloSubseccionFila}>
-                    <IconoDe spec={iconoEvento} size={14} color={tema.textoTenue} />
-                    <Text style={estilos.tituloSubseccion}>{nombreEvento}</Text>
-                  </View>
-                  {filas.map((fila, indice) => (
-                    <View key={fila.clave} style={estilos.filaRanking}>
-                      <Text style={estilos.puesto}>{indice + 1}</Text>
-                      <View style={estilos.avatarMini}>
-                        {fila.avatarUrl ? (
-                          <Image
-                            source={{ uri: fila.avatarUrl }}
-                            style={estilos.avatarMiniFoto}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <Text style={estilos.avatarMiniTexto}>
-                            {(fila.nombre.trim()[0] || '?').toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          estilos.nombreRanking,
-                          fila.clave === userId && estilos.nombreRankingYo,
-                        ]}
-                        numberOfLines={1}>
-                        {fila.nombre}
-                      </Text>
-                      <Text style={estilos.totalRanking}>{fila.total}</Text>
+          <View style={estilos.seccion}>
+            <Desplegable
+              abierto={clasificacionAbierta}
+              onToggle={() => setClasificacionAbierta((v) => !v)}
+              titulo="Clasificación"
+              icono={ICONOS.trofeo}
+              estiloCabecera={estilos.tituloSeccionFila}
+              estiloTitulo={estilos.tituloSeccion}>
+              <View style={estilos.contenidoDesplegable}>
+                {clasificacionPorCategoria.map(({ nombreCategoria, icono, eventos }) => (
+                  <Desplegable
+                    key={nombreCategoria}
+                    abierto={!!categoriasAbiertas[nombreCategoria]}
+                    onToggle={() => alternarCategoria(nombreCategoria)}
+                    titulo={nombreCategoria}
+                    etiquetaAccesible={`clasificación de ${nombreCategoria}`}
+                    icono={icono}
+                    estiloCabecera={estilos.cabeceraCategoria}
+                    estiloTitulo={estilos.tituloCategoria}>
+                    <View style={estilos.contenidoDesplegable}>
+                      {eventos.map(({ claveEvento, nombreEvento, iconoEvento, filas }) => {
+                        const claveGlobal = `${nombreCategoria}:${claveEvento}`;
+                        return (
+                          <Desplegable
+                            key={claveEvento}
+                            abierto={!!eventosAbiertos[claveGlobal]}
+                            onToggle={() => alternarEvento(claveGlobal)}
+                            titulo={nombreEvento}
+                            // "en {categoría}", no sólo el nombre del evento:
+                            // el evento "pises" se llama igual que su
+                            // categoría ("Gotitas"), y sin este sufijo la
+                            // cabecera del evento y la de su propia categoría
+                            // compartirían el mismo accessibilityLabel en
+                            // cuanto las dos estuvieran abiertas a la vez.
+                            etiquetaAccesible={`clasificación de ${nombreEvento} en ${nombreCategoria}`}
+                            icono={iconoEvento}
+                            estiloCabecera={estilos.cabeceraEvento}
+                            estiloTitulo={estilos.tituloEvento}>
+                            <View style={estilos.subseccion}>
+                              {filas.map((fila, indice) => (
+                                <View key={fila.clave} style={estilos.filaRanking}>
+                                  <Text style={estilos.puesto}>{indice + 1}</Text>
+                                  <View style={estilos.avatarMini}>
+                                    {fila.avatarUrl ? (
+                                      <Image
+                                        source={{ uri: fila.avatarUrl }}
+                                        style={estilos.avatarMiniFoto}
+                                        contentFit="cover"
+                                      />
+                                    ) : (
+                                      <Text style={estilos.avatarMiniTexto}>
+                                        {(fila.nombre.trim()[0] || '?').toUpperCase()}
+                                      </Text>
+                                    )}
+                                  </View>
+                                  <Text
+                                    style={[
+                                      estilos.nombreRanking,
+                                      fila.clave === userId && estilos.nombreRankingYo,
+                                    ]}
+                                    numberOfLines={1}>
+                                    {fila.nombre}
+                                  </Text>
+                                  <Text style={estilos.totalRanking}>{fila.total}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </Desplegable>
+                        );
+                      })}
                     </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          ))}
+                  </Desplegable>
+                ))}
+              </View>
+            </Desplegable>
+          </View>
 
           <View style={estilos.pie}>
             <View style={estilos.filaCodigo}>
@@ -470,15 +521,29 @@ const estilos = StyleSheet.create({
   botonMasTexto: { color: '#04121C', fontSize: 32, fontWeight: '800', lineHeight: 36 },
   pulsado: { opacity: 0.7, transform: [{ scale: 0.94 }] },
 
-  subseccion: { marginTop: 14 },
-  tituloSubseccionFila: {
+  // Los tres niveles del desplegable de Clasificación: la sección entera
+  // (tituloSeccionFila/tituloSeccion, ya definidos arriba, reusados como
+  // cabecera pulsable), cada categoría, y cada evento dentro de ella. Cada
+  // nivel indenta un poco más, para que se note que uno vive dentro del
+  // otro sin necesitar una línea de separación.
+  contenidoDesplegable: { marginTop: 4 },
+  cabeceraCategoria: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingLeft: 8,
+  },
+  tituloCategoria: { color: tema.texto, fontSize: 16, fontWeight: '700' },
+  cabeceraEvento: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
-    marginLeft: 4,
+    paddingVertical: 8,
+    paddingLeft: 22,
   },
-  tituloSubseccion: { color: tema.textoTenue, fontSize: 13, fontWeight: '700' },
+  tituloEvento: { color: tema.textoTenue, fontSize: 14, fontWeight: '600' },
+  subseccion: { marginBottom: 4, paddingLeft: 8 },
 
   filaRanking: {
     flexDirection: 'row',

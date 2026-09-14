@@ -110,4 +110,6 @@ export const ICONOS = {
   compartir: { fuente: 'feather', nombre: 'share-2' } as IconoSpec,
   camara: { fuente: 'feather', nombre: 'camera' } as IconoSpec,
   imagen: { fuente: 'feather', nombre: 'image' } as IconoSpec,
+  chevronAbajo: { fuente: 'feather', nombre: 'chevron-down' } as IconoSpec,
+  chevronDerecha: { fuente: 'feather', nombre: 'chevron-right' } as IconoSpec,
 } satisfies Record<string, IconoSpec>;

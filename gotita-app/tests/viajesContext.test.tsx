@@ -24,17 +24,24 @@ const viaje1 = {
 const viaje2 = { ...viaje1, id: 2, nombre: 'Oktoberfest', codigo: 'XYZ-999' };
 
 const mockCargarMisViajes = jest.fn();
+const mockActualizarAvatarEnMisViajes = jest.fn();
 
 jest.mock('@/lib/viajes', () => ({
   cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
+  actualizarAvatarEnMisViajes: (...args: unknown[]) => mockActualizarAvatarEnMisViajes(...args),
 }));
 
 const mockSesion = { valor: { user: { id: USUARIO } } as { user: { id: string } } | null };
+// Mutable aparte de la sesión: varios tests necesitan variar sólo esto sin
+// cambiar la identidad de `session` (que dispararía una recarga por su
+// cuenta y contaminaría el recuento de llamadas de estos tests).
+const mockAvatarUrl = { valor: null as string | null };
 
 jest.mock('@/lib/auth', () => ({
   useAuth: () => ({
     userId: mockSesion.valor?.user.id ?? '',
     session: mockSesion.valor,
+    avatarUrl: mockAvatarUrl.valor,
   }),
 }));
 
@@ -49,6 +56,7 @@ function Sonda() {
       <Text testID="cargando">{String(cargando)}</Text>
       <Text testID="cantidad">{viajes.length}</Text>
       <Text testID="activo">{viaje?.nombre ?? 'ninguno'}</Text>
+      <Text testID="avatar-activo">{viaje?.usuarios?.[USUARIO]?.avatarUrl ?? ''}</Text>
       <Text testID="error">{error ?? ''}</Text>
       <Pressable testID="elegir-2" onPress={() => setViajeActivoId(2)} />
       <Pressable testID="recargar" onPress={() => recargar()} />
@@ -67,7 +75,9 @@ function arbol() {
 
 beforeEach(() => {
   mockSesion.valor = { user: { id: USUARIO } };
+  mockAvatarUrl.valor = null;
   mockCargarMisViajes.mockReset().mockResolvedValue([viaje1, viaje2]);
+  mockActualizarAvatarEnMisViajes.mockReset().mockResolvedValue(undefined);
 });
 
 describe('useViajes fuera de ViajesProvider', () => {
@@ -206,5 +216,72 @@ describe('ViajesProvider', () => {
     expect(screen.getByTestId('cantidad')).toHaveTextContent('0');
     expect(screen.getByTestId('activo')).toHaveTextContent('ninguno');
     expect(mockCargarMisViajes).toHaveBeenCalledTimes(1); // no se pide nada sin userId
+  });
+});
+
+describe('autocorrección de avatarUrl (viajes de antes de que la propagación existiera)', () => {
+  it('sin foto en la cuenta, no comprueba ni propaga nada', async () => {
+    mockAvatarUrl.valor = null;
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(mockActualizarAvatarEnMisViajes).not.toHaveBeenCalled();
+    expect(mockCargarMisViajes).toHaveBeenCalledTimes(1); // una sola lectura, no dos
+  });
+
+  it('con foto en la cuenta y los viajes ya sincronizados, tampoco propaga', async () => {
+    mockAvatarUrl.valor = 'https://ejemplo.test/foto.jpg';
+    const sincronizado = (v: typeof viaje1) => ({
+      ...v,
+      usuarios: { [USUARIO]: { ...v.usuarios[USUARIO], avatarUrl: 'https://ejemplo.test/foto.jpg' } },
+    });
+    mockCargarMisViajes.mockResolvedValue([sincronizado(viaje1), sincronizado(viaje2)]);
+
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(mockActualizarAvatarEnMisViajes).not.toHaveBeenCalled();
+    expect(mockCargarMisViajes).toHaveBeenCalledTimes(1);
+  });
+
+  it('con foto en la cuenta y un viaje sin ella, propaga y recarga con el resultado', async () => {
+    mockAvatarUrl.valor = 'https://ejemplo.test/foto.jpg';
+    // Primera lectura: el viaje activo no tiene avatarUrl (el caso real que
+    // motivó esto: se creó antes de que la propagación existiera). Segunda
+    // lectura (tras la propagación): ya la tiene.
+    mockCargarMisViajes
+      .mockResolvedValueOnce([viaje1, viaje2])
+      .mockResolvedValueOnce([
+        {
+          ...viaje1,
+          usuarios: { [USUARIO]: { ...viaje1.usuarios[USUARIO], avatarUrl: 'https://ejemplo.test/foto.jpg' } },
+        },
+        viaje2,
+      ]);
+
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(mockActualizarAvatarEnMisViajes).toHaveBeenCalledWith(
+      USUARIO,
+      'https://ejemplo.test/foto.jpg'
+    );
+    expect(mockCargarMisViajes).toHaveBeenCalledTimes(2); // la de siempre + la de después de reparar
+    expect(screen.getByTestId('avatar-activo')).toHaveTextContent('https://ejemplo.test/foto.jpg');
+  });
+
+  it('si la propagación falla, no rompe la carga normal (best-effort)', async () => {
+    mockAvatarUrl.valor = 'https://ejemplo.test/foto.jpg';
+    mockActualizarAvatarEnMisViajes.mockRejectedValue(new Error('sin red'));
+
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(screen.getByTestId('cantidad')).toHaveTextContent('2');
+    expect(screen.getByTestId('error')).toHaveTextContent(''); // no es un error de carga
   });
 });

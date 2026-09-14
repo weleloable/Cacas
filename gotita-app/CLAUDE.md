@@ -118,12 +118,22 @@ de línea, no emoji — ver "Iconos en vez de emoji" más abajo.
   la cuenta y el resto de viajes sí se actualizaron. Los viajes ya
   finalizados no se tocan (se quedan con el nombre que tenían, como registro
   histórico).
-- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.0`), leída
+- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.2`), leída
   con `expo-constants` (`Constants.expoConfig?.version`), no importando
   `app.json` directamente: es la fuente de verdad en tiempo de ejecución.
   Bajo Jest ese manifest no existe (sólo lo inyecta el build de Expo), así
   que `tests/perfil.test.tsx` mockea `expo-constants` explícitamente en vez
   de fiarse del valor real.
+- **Toda tarea que cambie comportamiento sube la versión** (`app.json`,
+  `package.json` y el `"version"` de `package-lock.json`, los tres a la vez).
+  Comprobado en vivo que subir sólo el número no basta: Metro cachea el
+  bundle entre builds y, si el caché no se invalida, `expoConfig.version`
+  sigue sirviendo el número VIEJO aunque `app.json` ya tenga el nuevo (pasó
+  con la 1.0.1, que nunca llegó a verse en la web pese a estar bien escrita
+  en el JSON). Por eso `build:web` lleva `--clear` de forma permanente
+  (`expo export --platform web --clear`) — nunca quitarlo para "ir más
+  rápido": ese flag es la única razón de que el número que se ve en Perfil
+  sea de fiar.
 
 ## Icono
 

@@ -24,7 +24,12 @@ export const CATEGORIAS: Record<string, CategoriaInfo> = {
     icono: ICONOS.gota,
     eventos: {
       cacas: { nombre: 'Cacas', icono: { fuente: 'mci', nombre: 'emoticon-poop' } },
-      pises: { nombre: 'Pises', icono: ICONOS.gota },
+      // El nombre de este evento es "Gotitas", igual que su categoría: es
+      // deliberado (pedido explícito), no un duplicado accidental. La clave
+      // interna sigue siendo `pises` porque es la que ya hay guardada en el
+      // JSON `usuarios` de Supabase — renombrar la clave exigiría migrar
+      // datos, renombrar sólo lo que se enseña no.
+      pises: { nombre: 'Gotitas', icono: ICONOS.gota },
     },
   },
   Bebidas: {

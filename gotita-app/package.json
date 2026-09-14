@@ -1,7 +1,7 @@
 {
   "name": "gotita-app",
   "main": "expo-router/entry",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "dependencies": {
     "@expo/ui": "~57.0.18",
     "@expo/vector-icons": "^15.0.2",
@@ -53,7 +53,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "iconos": "python scripts/generar-iconos.py",
-    "build:web": "expo export --platform web && node scripts/preparar-web.js",
+    "build:web": "expo export --platform web --clear && node scripts/preparar-web.js",
     "publicar": "bash scripts/publicar.sh",
     "desplegar": "npm run build:web && npm run publicar"
   },
