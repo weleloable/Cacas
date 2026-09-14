@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Publica el build web en la rama gh-pages, que es lo que sirve
-# https://weleloable.github.io/Cacas/
+# https://weleloable.github.io/Gotita/
 #
 # Uso, desde gotita-app/:   npm run publicar
 #
@@ -48,4 +48,4 @@ fi
 
 git -C "$TEMPORAL" commit -qm "Publicar Gotita ($(git -C "$RAIZ" rev-parse --short HEAD))"
 git -C "$TEMPORAL" push -q origin gh-pages
-echo "Publicado en https://weleloable.github.io/Cacas/ (tarda un minuto en refrescarse)"
+echo "Publicado en https://weleloable.github.io/Gotita/ (tarda un minuto en refrescarse)"

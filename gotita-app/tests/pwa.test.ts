@@ -16,6 +16,11 @@ import { join } from 'node:path';
 const raiz = join(__dirname, '..');
 const publico = join(raiz, 'public');
 const manifest = JSON.parse(readFileSync(join(publico, 'manifest.json'), 'utf8'));
+// El baseUrl real, leído de app.json igual que hace preparar-web.js. Nada de
+// "/Gotita" escrito a mano en estos tests: cuando el repo se renombró (antes
+// Cacas) había diez copias sueltas de la ruta que había que acordarse de tocar.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const BASE: string = require('../app.json').expo.experiments.baseUrl;
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { inyectarPwa, rutasDelBundle, ErrorDePreparacion } = require('../scripts/preparar-web.js');
@@ -51,27 +56,31 @@ describe('manifest.json', () => {
   });
 
   it('start_url y scope son relativos, para no romperse si cambia el baseUrl', () => {
-    // Están servidos desde /Cacas/. Absolutos habría que tocarlos a mano el día
-    // que la app se mueva de sitio, y nadie se acordaría.
+    // Están servidos desde el baseUrl. Absolutos habría que tocarlos a mano el
+    // día que la app se mueva de sitio (ya pasó: Cacas -> Gotita).
     expect(manifest.start_url).toBe('./');
     expect(manifest.scope).toBe('./');
   });
 
-  it('id es absoluto a propósito: NUNCA debe cambiar de valor', () => {
+  it('id es absoluto a propósito, y es la ruta del baseUrl', () => {
     // Contraintuitivo y por eso este test existe. El spec resuelve `id` contra
     // el ORIGEN del documento, no contra la carpeta del manifest ni contra
     // start_url: new URL(id, origin). "./" resolvería a
     // "https://weleloable.github.io/", que es la RAÍZ DE TODO EL SITIO
-    // weleloable.github.io, no "/Cacas/". Con ese valor, la instalación de
-    // Gotita reclamaría el origin entero y cualquier futura PWA del mismo
-    // usuario en ese dominio colisionaría con ella.
+    // weleloable.github.io, no la carpeta de la app. Con ese valor, la
+    // instalación de Gotita reclamaría el origin entero y cualquier futura PWA
+    // del mismo usuario en ese dominio colisionaría con ella.
     //
     // Además, `id` es la identidad de la instalación: cambiar su valor
     // resuelto hace que Chrome dé de alta una instalación NUEVA en vez de
-    // actualizar la existente, duplicando el icono en el escritorio de quien
-    // ya la tuviera instalada. Por eso va fijo a la ruta completa y no debe
-    // tocarse aunque start_url y scope sean relativos.
-    expect(manifest.id).toBe('/Cacas/');
+    // actualizar la existente, duplicando el icono de quien ya la tuviera.
+    // Por eso no se toca mientras la app viva en la misma URL. La única vez
+    // que cambia es cuando cambia la URL (renombrar el repo mueve GitHub
+    // Pages y ya obliga a reinstalar), y entonces tiene que seguir al baseUrl:
+    // un id de la ruta vieja sobre un sitio servido en la nueva sería una
+    // identidad huérfana.
+    expect(manifest.id).toMatch(/^\/.+\/$/);
+    expect(manifest.id).toBe(`${BASE}/`);
   });
 
   it('los colores coinciden con el tema de la app, para que no pegue un fogonazo al abrir', () => {
@@ -113,7 +122,7 @@ describe('inyección en el HTML del build', () => {
   // plantilla escrita a mano: si Expo cambia la suya en un SDK nuevo, esta se
   // queda vieja, y para eso está el test de "revienta si no encaja".
   const original = readFileSync(join(__dirname, 'fixtures/expo-index.html'), 'utf8');
-  const resultado: string = inyectarPwa(original, '/Cacas');
+  const resultado: string = inyectarPwa(original, BASE);
 
   it('el fixture es el HTML crudo de Expo, sin nada inyectado', () => {
     expect(original).toContain('<html lang="en">');
@@ -121,12 +130,12 @@ describe('inyección en el HTML del build', () => {
   });
 
   it('enlaza el manifest y el icono de iOS con el baseUrl delante', () => {
-    expect(resultado).toContain('<link rel="manifest" href="/Cacas/manifest.json" />');
-    expect(resultado).toContain('href="/Cacas/iconos/apple-touch-icon.png"');
+    expect(resultado).toContain(`<link rel="manifest" href="${BASE}/manifest.json" />`);
+    expect(resultado).toContain(`href="${BASE}/iconos/apple-touch-icon.png"`);
   });
 
   it('registra el service worker con el scope correcto', () => {
-    expect(resultado).toContain("register('/Cacas/sw.js', { scope: '/Cacas/' })");
+    expect(resultado).toContain(`register('${BASE}/sw.js', { scope: '${BASE}/' })`);
   });
 
   it('pone el idioma en castellano y el viewport a pantalla completa', () => {
@@ -142,7 +151,7 @@ describe('inyección en el HTML del build', () => {
   });
 
   it('es idempotente: pasarlo dos veces no duplica el manifest', () => {
-    const dosVeces: string = inyectarPwa(resultado, '/Cacas');
+    const dosVeces: string = inyectarPwa(resultado, BASE);
     expect(dosVeces).toBe(resultado);
     expect(dosVeces.match(/rel="manifest"/g)).toHaveLength(1);
   });
@@ -150,16 +159,16 @@ describe('inyección en el HTML del build', () => {
   it('revienta si el HTML no es el que espera, en vez de publicar en silencio', () => {
     // El día que Expo cambie su plantilla, esto es lo que evita publicar una
     // web que ya no se puede instalar y que nadie se entere.
-    expect(() => inyectarPwa('<html lang="en"><head></head></html>', '/Cacas')).toThrow(
+    expect(() => inyectarPwa('<html lang="en"><head></head></html>', BASE)).toThrow(
       ErrorDePreparacion
     );
-    expect(() => inyectarPwa('<html lang="en"><head></head></html>', '/Cacas')).toThrow(
+    expect(() => inyectarPwa('<html lang="en"><head></head></html>', BASE)).toThrow(
       /viewport/
     );
   });
 
   it('encuentra el bundle con hash para poder precargarlo', () => {
-    const rutas: string[] = rutasDelBundle(original, '/Cacas');
+    const rutas: string[] = rutasDelBundle(original, BASE);
     expect(rutas.length).toBeGreaterThan(0);
     for (const r of rutas) {
       expect(r).toMatch(/^\.\/_expo\/static\/js\/web\/entry-[0-9a-f]+\.js$/);
@@ -167,7 +176,7 @@ describe('inyección en el HTML del build', () => {
   });
 
   it('revienta si no hay bundle: sin él la app no arranca sin red', () => {
-    expect(() => rutasDelBundle('<html><body></body></html>', '/Cacas')).toThrow(
+    expect(() => rutasDelBundle('<html><body></body></html>', BASE)).toThrow(
       ErrorDePreparacion
     );
   });
@@ -193,7 +202,7 @@ const hayBuild = existsSync(join(dist, 'index.html'));
 
   it('el index ya trae el manifest inyectado', () => {
     expect(readFileSync(join(dist, 'index.html'), 'utf8')).toContain(
-      '<link rel="manifest" href="/Cacas/manifest.json" />'
+      `<link rel="manifest" href="${BASE}/manifest.json" />`
     );
   });
 

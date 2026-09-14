@@ -3,6 +3,10 @@
 Contador de eventos (cacas, pises, cervezas...) para viajes con amigos. Proyecto
 personal de Eduardo, un solo desarrollador, sin equipo ni revisores.
 
+Repo: `weleloable/Gotita` (se llamaba `Cacas`; la carpeta local puede seguir
+llamándose así). Web: https://weleloable.github.io/Gotita/. `Cacas.py` y el
+evento "Cacas" no tienen que ver con el nombre del repo y no se renombran.
+
 ## Dos apps, una en retirada
 
 - `gotita-app/` — **la actual**. Expo SDK 57 + React Native + expo-router,

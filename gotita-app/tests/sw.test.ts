@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 
-const SCOPE = 'https://weleloable.github.io/Cacas/';
+const SCOPE = 'https://weleloable.github.io/Gotita/';
 const swFuente = readFileSync(join(__dirname, '..', 'public', 'sw.js'), 'utf8');
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires

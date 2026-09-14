@@ -13,8 +13,14 @@ npm run iconos                                # regenera public/iconos (necesita
 
 ## Web y PWA
 
-Se sirve en https://weleloable.github.io/Cacas/ desde la rama `gh-pages`.
-`experiments.baseUrl` es `/Cacas`, así que todo cuelga de ahí.
+Se sirve en https://weleloable.github.io/Gotita/ desde la rama `gh-pages`.
+`experiments.baseUrl` es `/Gotita`, así que todo cuelga de ahí.
+
+El repo se llamaba `Cacas` y se renombró a `Gotita` (v1.0.4). GitHub redirige
+el repo, pero **no redirige GitHub Pages**: `/Cacas/` quedó en 404 a
+propósito (corte limpio, sin página de redirección) y quien tuviera la app
+instalada tuvo que reinstalarla desde `/Gotita/`. Crear otro repo llamado
+`Cacas` rompería la redirección de git de GitHub para clones viejos.
 
 Expo SDK 57 no genera manifest PWA y, con `web.output: "single"`, **ignora
 `src/app/+html.tsx`** (comprobado: el HTML sale igual con él que sin él). Por
@@ -30,11 +36,14 @@ Expo hay que recapturarlo (`npx expo export --platform web` y copiar el
 Piezas de la PWA:
 
 - `public/manifest.json` — Expo copia `public/` a la raíz de `dist/`.
-  **`id` es `/Cacas/`, absoluto, y NUNCA debe cambiarse ni hacerse relativo.**
+  **`id` es `/Gotita/`, absoluto, y no debe cambiarse ni hacerse relativo
+  mientras la app viva en esa URL.** Sólo cambia si cambia la URL (como en el
+  renombrado), y entonces debe ser `baseUrl + "/"`: `tests/pwa.test.ts` lo
+  deriva de `app.json`, así que no pueden desalinearse.
   El spec resuelve `id` contra el *origin* del documento, no contra la carpeta
   del manifest ni contra `start_url`: `new URL(id, origin)`. Un `id` relativo
   como `"./"` resolvería a `https://weleloable.github.io/` — la raíz de TODO
-  el dominio de GitHub Pages del usuario, no sólo `/Cacas/` — y cambiar su
+  el dominio de GitHub Pages del usuario, no sólo `/Gotita/` — y cambiar su
   valor resuelto hace que Chrome dé de alta una instalación nueva en vez de
   actualizar la existente (icono duplicado para quien ya la tuviera
   instalada). `start_url` y `scope` sí son relativos (`"./"`), y esos dos no
@@ -121,7 +130,7 @@ de línea, no emoji — ver "Iconos en vez de emoji" más abajo.
 - "Crear viaje" resetea su estado local ANTES de `router.replace('/viaje')`
   (`alEmpezarAContar`): como las pestañas no se desmontan, sin eso volver a
   la pestaña enseñaba la pantalla de éxito del viaje anterior.
-- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.3`), leída
+- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.4`), leída
   con `expo-constants` (`Constants.expoConfig?.version`), no importando
   `app.json` directamente: es la fuente de verdad en tiempo de ejecución.
   Bajo Jest ese manifest no existe (sólo lo inyecta el build de Expo), así
