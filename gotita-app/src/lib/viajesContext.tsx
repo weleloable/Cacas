@@ -37,6 +37,19 @@ type ViajesContextoValor = {
 const Contexto = createContext<ViajesContextoValor | null>(null);
 
 /**
+ * A qué viaje saltar cuando no hay uno ya elegido (primera carga, o el
+ * elegido dejó de estar en la lista). Desde que `cargarMisViajes` trae
+ * también los finalizados (para poder seguir viéndolos), `mios[0]` a secas
+ * ya no vale: si el orden que devuelve Supabase (sin ORDER BY) pone un viaje
+ * finalizado antiguo por delante del activo de verdad, el usuario aterriza
+ * en un viaje que ya no puede tocar en vez del que está usando ahora mismo.
+ * Se prefiere un activo si lo hay; si no hay ninguno, el primero que llegue.
+ */
+function viajeActivoPorDefecto(mios: Viaje[]): number | null {
+  return mios.find((v) => v.activo)?.id ?? mios[0]?.id ?? null;
+}
+
+/**
  * Qué viajes tiene el usuario y cuál es el activo, compartido entre las
  * pestañas "Mi Viaje" y "Mis viajes": cambiar el activo en una pestaña tiene
  * que reflejarse en la otra sin depender de que ambas monten y recarguen por
@@ -88,8 +101,12 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
         // tiene foto y algún viaje activo no la refleja, se propaga y se
         // recarga, sin que el usuario tenga que hacer nada.
         if (avatarUrl) {
+          // Sólo viajes activos, igual que `actualizarAvatarEnMisViajes`: un
+          // finalizado sin foto no se va a reparar nunca (a propósito), y
+          // contarlo aquí haría una escritura y una segunda lectura en CADA
+          // recarga para siempre.
           const desincronizado = mios.some(
-            (v) => v.usuarios?.[userId] && v.usuarios[userId].avatarUrl !== avatarUrl
+            (v) => v.activo && v.usuarios?.[userId] && v.usuarios[userId].avatarUrl !== avatarUrl
           );
           if (desincronizado) {
             await actualizarAvatarEnMisViajes(userId, avatarUrl).catch(() => {
@@ -105,7 +122,7 @@ export function ViajesProvider({ children }: { children: ReactNode }) {
 
         setViajes(mios);
         setViajeActivoIdInterno((actual) =>
-          actual && mios.some((v) => v.id === actual) ? actual : (mios[0]?.id ?? null)
+          actual && mios.some((v) => v.id === actual) ? actual : viajeActivoPorDefecto(mios)
         );
         if (tocarError) setError(null);
       } catch (e) {

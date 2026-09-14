@@ -6,7 +6,9 @@
 import {
   actualizarAvatarEnMisViajes,
   actualizarNombreEnMisViajes,
+  cargarMisViajes,
   ConflictoDeConcurrencia,
+  finalizarViaje,
   modificarEvento,
 } from '@/lib/viajes';
 
@@ -97,17 +99,25 @@ describe('modificarEvento', () => {
     await expect(modificarEvento(1, OTRO, 'cacas', 1)).rejects.toThrow('No estás apuntado');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
+
+  it('en un viaje ya finalizado no escribe, aunque el cliente lo creyera activo', async () => {
+    // El caso real: otro móvil con el viaje pintado como activo (no se ha
+    // enterado del cierre) pulsa +. Sólo la fila recién leída sabe la verdad.
+    mockSingle.mockResolvedValue({ data: { ...viaje(1, 'Cangas'), activo: false }, error: null });
+
+    await expect(modificarEvento(1, USUARIO, 'cacas', 1)).rejects.toThrow('finalizado');
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe('actualizarNombreEnMisViajes', () => {
   // No se mockea cargarMisViajes: se deja correr de verdad, y se le da forma
   // a `mockSelect` para que sirva a las dos formas en que este fichero llama
-  // a supabase (`select().eq().single()` de cargarUnViaje y
-  // `select().eq()` sin single de cargarMisViajes).
+  // a supabase (`select().eq().single()` de cargarUnViaje y `select()` a
+  // secas, sin más encadenado, de cargarMisViajes — ya no filtra por
+  // `activo`, para que los viajes finalizados sigan siendo visibles).
   it('actualiza el nombre en cada viaje donde participas', async () => {
-    // cargarMisViajes hace su propio select().eq('activo',true); sin
-    // single(), así que se reconfigura aquí sólo para este describe.
-    mockSelect.mockReturnValue({ eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }) });
+    mockSelect.mockResolvedValue({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null });
     const eqSpy = jest.fn(() => Promise.resolve({ error: null }));
     mockUpdate.mockReturnValue({ eq: eqSpy });
 
@@ -121,16 +131,14 @@ describe('actualizarNombreEnMisViajes', () => {
   it('no escribe en un viaje si ya tenía ese nombre', async () => {
     const v = viaje(1, 'Cangas');
     v.usuarios[USUARIO].nombre = 'Eduardo';
-    mockSelect.mockReturnValue({ eq: () => Promise.resolve({ data: [v], error: null }) });
+    mockSelect.mockResolvedValue({ data: [v], error: null });
 
     await actualizarNombreEnMisViajes(USUARIO, 'Eduardo');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('si un viaje falla al escribir, los demás no se ven afectados y no revienta', async () => {
-    mockSelect.mockReturnValue({
-      eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }),
-    });
+    mockSelect.mockResolvedValue({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null });
     let llamada = 0;
     mockUpdate.mockReturnValue({
       eq: () => {
@@ -146,9 +154,7 @@ describe('actualizarNombreEnMisViajes', () => {
 
 describe('actualizarAvatarEnMisViajes', () => {
   it('actualiza la URL del avatar en cada viaje donde participas', async () => {
-    mockSelect.mockReturnValue({
-      eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }),
-    });
+    mockSelect.mockResolvedValue({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null });
     const eqSpy = jest.fn(() => Promise.resolve({ error: null }));
     mockUpdate.mockReturnValue({ eq: eqSpy });
 
@@ -164,16 +170,14 @@ describe('actualizarAvatarEnMisViajes', () => {
   it('no escribe en un viaje si ya tenía esa URL', async () => {
     const v = viaje(1, 'Cangas');
     v.usuarios[USUARIO] = { ...v.usuarios[USUARIO], avatarUrl: 'https://ejemplo.test/foto.jpg' };
-    mockSelect.mockReturnValue({ eq: () => Promise.resolve({ data: [v], error: null }) });
+    mockSelect.mockResolvedValue({ data: [v], error: null });
 
     await actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('si un viaje falla al escribir, los demás no se ven afectados y no revienta', async () => {
-    mockSelect.mockReturnValue({
-      eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }),
-    });
+    mockSelect.mockResolvedValue({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null });
     let llamada = 0;
     mockUpdate.mockReturnValue({
       eq: () => {
@@ -186,5 +190,63 @@ describe('actualizarAvatarEnMisViajes', () => {
       actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg')
     ).resolves.toBeUndefined();
     expect(mockUpdate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('propagar nombre y foto no toca viajes finalizados', () => {
+  // Regresión: al dejar de filtrar `activo` en cargarMisViajes, estas dos
+  // funciones empezaron a reescribir también los viajes cerrados, que deben
+  // quedarse como registro histórico.
+  function viajesMixtos() {
+    return [viaje(1, 'Cangas'), { ...viaje(2, 'Oktoberfest'), activo: false }];
+  }
+
+  it('actualizarNombreEnMisViajes sólo escribe en el activo', async () => {
+    mockSelect.mockResolvedValue({ data: viajesMixtos(), error: null });
+    const eqSpy = jest.fn((_col: string, _id: number) => Promise.resolve({ error: null }));
+    mockUpdate.mockReturnValue({ eq: eqSpy });
+
+    await actualizarNombreEnMisViajes(USUARIO, 'Eduardo');
+
+    expect(eqSpy).toHaveBeenCalledTimes(1);
+    expect(eqSpy).toHaveBeenCalledWith('id', 1);
+  });
+
+  it('actualizarAvatarEnMisViajes sólo escribe en el activo', async () => {
+    mockSelect.mockResolvedValue({ data: viajesMixtos(), error: null });
+    const eqSpy = jest.fn((_col: string, _id: number) => Promise.resolve({ error: null }));
+    mockUpdate.mockReturnValue({ eq: eqSpy });
+
+    await actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg');
+
+    expect(eqSpy).toHaveBeenCalledTimes(1);
+    expect(eqSpy).toHaveBeenCalledWith('id', 1);
+  });
+});
+
+describe('cargarMisViajes', () => {
+  it('ya no filtra por activo: trae también los finalizados', async () => {
+    const finalizado = { ...viaje(2, 'Oktoberfest'), activo: false, fecha_finalizacion: '2026-09-10' };
+    mockSelect.mockResolvedValue({ data: [viaje(1, 'Cangas'), finalizado], error: null });
+
+    const mios = await cargarMisViajes(USUARIO);
+
+    expect(mios.map((v) => v.id)).toEqual([1, 2]);
+    expect(mockSelect).toHaveBeenCalledWith('*'); // sin un segundo eq('activo', true) encima
+  });
+});
+
+describe('finalizarViaje', () => {
+  it('pone activo a false y fecha_finalizacion a la hora actual', async () => {
+    const actualizado = { ...viaje(1, 'Cangas'), activo: false, fecha_finalizacion: '2026-09-14T10:00:00.000Z' };
+    mockUpdate.mockReturnValue({ eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: actualizado, error: null }) }) }) });
+
+    const resultado = await finalizarViaje(1);
+
+    expect(resultado.activo).toBe(false);
+    expect(resultado.fecha_finalizacion).toBe('2026-09-14T10:00:00.000Z');
+    const payload = mockUpdate.mock.calls[0][0] as { activo: boolean; fecha_finalizacion: string };
+    expect(payload.activo).toBe(false);
+    expect(typeof payload.fecha_finalizacion).toBe('string');
   });
 });

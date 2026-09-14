@@ -8,8 +8,8 @@ import { radio, tema } from '@/lib/tema';
 import { useViajes } from '@/lib/viajesContext';
 
 /**
- * Lista de todos los viajes activos del usuario. Tocar uno lo marca como
- * activo (compartido con la pestaña "Mi Viaje" vía `useViajes`) y salta ahí,
+ * Lista de todos los viajes del usuario, en marcha y finalizados (estos con
+ * su insignia). Tocar uno lo marca como elegido (compartido con la pestaña "Mi Viaje" vía `useViajes`) y salta ahí,
  * porque ver los contadores es lo que se quiere hacer justo después de elegir
  * viaje.
  */
@@ -64,21 +64,33 @@ export default function PantallaMisViajes() {
         </View>
       ) : (
         viajes.map((v) => {
-          const activo = v.id === viajeActivoId;
+          // "Elegido" (esta tarjeta, la que está marcada en el contexto
+          // compartido) no es lo mismo que `v.activo` (el viaje en sí no
+          // está finalizado): un viaje finalizado puede perfectamente seguir
+          // siendo el elegido, si es el que se estaba viendo al cerrarlo.
+          const esElElegido = v.id === viajeActivoId;
           return (
             <Pressable
               key={v.id}
               testID={`viaje-${v.id}`}
               onPress={() => elegir(v.id)}
               accessibilityRole="button"
-              style={[estilos.tarjeta, activo && estilos.tarjetaActiva]}>
+              style={[estilos.tarjeta, esElElegido && estilos.tarjetaActiva]}>
               <View style={estilos.tarjetaTextos}>
                 <Text style={estilos.nombreViaje}>{v.nombre}</Text>
                 <Text style={estilos.codigo}>Código: {v.codigo}</Text>
               </View>
-              {activo ? (
+              {esElElegido ? (
+                // "Viendo", no "Activo": un viaje finalizado puede ser el
+                // elegido igual que uno en marcha, y las dos insignias
+                // pueden convivir en la misma tarjeta sin contradecirse.
                 <View style={estilos.insignia}>
-                  <Text style={estilos.insigniaTexto}>Activo</Text>
+                  <Text style={estilos.insigniaTexto}>Viendo</Text>
+                </View>
+              ) : null}
+              {!v.activo ? (
+                <View style={estilos.insigniaFinalizado}>
+                  <Text style={estilos.insigniaFinalizadoTexto}>Finalizado</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -138,6 +150,15 @@ const estilos = StyleSheet.create({
     paddingVertical: 6,
   },
   insigniaTexto: { color: '#04121C', fontSize: 12, fontWeight: '800' },
+  insigniaFinalizado: {
+    backgroundColor: tema.fondoElevado,
+    borderWidth: 1,
+    borderColor: tema.borde,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  insigniaFinalizadoTexto: { color: tema.textoTenue, fontSize: 12, fontWeight: '700' },
 
   vacio: { alignItems: 'center', paddingTop: 50, paddingHorizontal: 12 },
   vacioTitulo: {

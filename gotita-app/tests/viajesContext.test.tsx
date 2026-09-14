@@ -105,6 +105,29 @@ describe('ViajesProvider', () => {
     expect(screen.getByTestId('cargando')).toHaveTextContent('false');
   });
 
+  it('por defecto prefiere un viaje en marcha aunque un finalizado llegue antes', async () => {
+    // Supabase no garantiza orden (no hay ORDER BY): un viaje cerrado antiguo
+    // puede venir primero. Aterrizar en él dejaría al usuario sin botones.
+    mockCargarMisViajes.mockResolvedValue([{ ...viaje2, activo: false }, viaje1]);
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(screen.getByTestId('activo')).toHaveTextContent('Cangas');
+  });
+
+  it('si todos están finalizados, elige el primero en vez de ninguno', async () => {
+    mockCargarMisViajes.mockResolvedValue([
+      { ...viaje1, activo: false },
+      { ...viaje2, activo: false },
+    ]);
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(screen.getByTestId('activo')).toHaveTextContent('Cangas');
+  });
+
   it('cambiar el activo se refleja en el mismo render, sin recargar', async () => {
     await act(async () => {
       render(arbol());
@@ -271,6 +294,25 @@ describe('autocorrección de avatarUrl (viajes de antes de que la propagación e
     );
     expect(mockCargarMisViajes).toHaveBeenCalledTimes(2); // la de siempre + la de después de reparar
     expect(screen.getByTestId('avatar-activo')).toHaveTextContent('https://ejemplo.test/foto.jpg');
+  });
+
+  it('un viaje finalizado sin foto no cuenta como desincronizado', async () => {
+    // Regresión: actualizarAvatarEnMisViajes no toca finalizados (a
+    // propósito), así que si este chequeo los contara, cada recarga haría una
+    // propagación inútil y una segunda lectura, para siempre.
+    mockAvatarUrl.valor = 'https://ejemplo.test/foto.jpg';
+    const conFoto = {
+      ...viaje1,
+      usuarios: { [USUARIO]: { ...viaje1.usuarios[USUARIO], avatarUrl: 'https://ejemplo.test/foto.jpg' } },
+    };
+    mockCargarMisViajes.mockResolvedValue([conFoto, { ...viaje2, activo: false }]);
+
+    await act(async () => {
+      render(arbol());
+    });
+
+    expect(mockActualizarAvatarEnMisViajes).not.toHaveBeenCalled();
+    expect(mockCargarMisViajes).toHaveBeenCalledTimes(1);
   });
 
   it('si la propagación falla, no rompe la carga normal (best-effort)', async () => {

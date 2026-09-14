@@ -1,9 +1,14 @@
 import * as Clipboard from 'expo-clipboard';
 import { Platform, Share } from 'react-native';
 
-/** Copia el código al portapapeles. Igual en web y en nativo. */
+/** Copia cualquier texto al portapapeles. Igual en web y en nativo. */
+export async function copiarTexto(texto: string): Promise<void> {
+  await Clipboard.setStringAsync(texto);
+}
+
+/** Copia el código al portapapeles. */
 export async function copiarCodigo(codigo: string): Promise<void> {
-  await Clipboard.setStringAsync(codigo);
+  await copiarTexto(codigo);
 }
 
 export type ResultadoCompartir = 'compartido' | 'copiado' | 'cancelado';

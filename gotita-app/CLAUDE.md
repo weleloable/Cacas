@@ -5,7 +5,7 @@
 ```bash
 npx expo start --web --host lan --port 8082   # dev, accesible desde el móvil
 npx tsc --noEmit                              # chequeo de tipos
-npm test                                      # gate tests (jest-expo), 77 en total
+npm test                                      # gate tests (jest-expo)
 npm run build:web                             # build a dist/ + inyección PWA
 npm run desplegar                             # build + publicar en gh-pages
 npm run iconos                                # regenera public/iconos (necesita Pillow)
@@ -118,7 +118,10 @@ de línea, no emoji — ver "Iconos en vez de emoji" más abajo.
   la cuenta y el resto de viajes sí se actualizaron. Los viajes ya
   finalizados no se tocan (se quedan con el nombre que tenían, como registro
   histórico).
-- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.2`), leída
+- "Crear viaje" resetea su estado local ANTES de `router.replace('/viaje')`
+  (`alEmpezarAContar`): como las pestañas no se desmontan, sin eso volver a
+  la pestaña enseñaba la pantalla de éxito del viaje anterior.
+- Perfil enseña la versión de la app abajo del todo (`Gotita v1.0.3`), leída
   con `expo-constants` (`Constants.expoConfig?.version`), no importando
   `app.json` directamente: es la fuente de verdad en tiempo de ejecución.
   Bajo Jest ese manifest no existe (sólo lo inyecta el build de Expo), así
@@ -211,6 +214,31 @@ deprisa con IA".
 - El botón atrás de Android **no** cancela el diálogo en el build web:
   `onRequestClose` sólo se dispara con Escape en react-native-web.
 
+## Finalizar viaje
+
+- Sólo el admin (`viaje.admin === userId`) ve "Finalizar viaje", con el mismo
+  `DialogoConfirmar` que restar. `finalizarViaje` (lib/viajes.ts) pone
+  `activo=false` y `fecha_finalizacion`.
+- Un viaje finalizado es de sólo lectura para TODOS, admin incluido: sin +/−,
+  con un aviso y la fecha arriba. La pantalla oculta los botones, pero quien
+  lo hace cumplir es `modificarEvento`, que rechaza escribir si la fila
+  recién leída ya no está activa: otro móvil puede seguir teniéndolo pintado
+  como activo.
+- `cargarMisViajes` ya NO filtra `activo`: quien estaba dentro sigue viendo la
+  clasificación final. Consecuencias que hay que mantener:
+  - `actualizarNombreEnMisViajes` y `actualizarAvatarEnMisViajes` filtran
+    `activo` ellas mismas (un viaje cerrado es registro histórico).
+  - La autocorrección de avatar de `ViajesProvider` ignora los finalizados;
+    si los contara, cada recarga haría una escritura y una segunda lectura
+    para siempre.
+  - El viaje por defecto prefiere uno en marcha (`viajeActivoPorDefecto`),
+    porque Supabase no garantiza orden.
+  - "Mis viajes" distingue "Viendo" (el elegido) de "Finalizado" (el estado
+    del viaje); pueden convivir en la misma tarjeta.
+- El admin de un viaje finalizado puede copiar la clasificación en texto y un
+  prompt para una IA (`lib/reporte.ts`). No se llama a ninguna IA desde la
+  app: no hay backend donde guardar una clave.
+
 ## Tests
 
 `npm test`. Jest con el preset `jest-expo`, tests en `tests/`. Sin red: el
@@ -234,8 +262,14 @@ deprisa con IA".
   `error`.
 - `mis-viajes.test.tsx`, `perfil.test.tsx` — las pantallas nuevas, montadas
   con el `ViajesProvider` real (no una versión de mentira del contexto).
-- `viajes.test.ts` — `modificarEvento` y `actualizarNombreEnMisViajes`
-  ejecutando la implementación real, mockeando sólo `supabase`.
+- `viajes.test.ts` — `modificarEvento` (incluido el rechazo en viaje
+  finalizado), propagación de nombre/foto (que no toca finalizados),
+  `cargarMisViajes` y `finalizarViaje`, ejecutando la implementación real y
+  mockeando sólo `supabase`.
+- `reporte.test.ts` — el texto copiable de la clasificación y el prompt de IA:
+  orden, nombre visible del evento, categorías que ya no existen.
+- `crear.test.tsx` — que tras "Empezar a contar" la pestaña vuelve al
+  formulario en blanco.
 - `iconos.test.ts` — comprueba contra el glyphmap real instalado que cada
   nombre de icono usado (en `ICONOS`, en `CATEGORIAS`, en el diálogo de
   confirmación) existe de verdad, y que la gota es un único spec compartido.

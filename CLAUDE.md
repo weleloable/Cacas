@@ -95,8 +95,12 @@ Node y gh se instalaron con winget. En PowerShell hace falta recargar el PATH:
 ## Pendiente
 
 - Pantalla de Reportes (gráficos y estadísticas del viaje finalizado)
-- Finalizar viaje desde la app
-- Narrativa IA con Groq (existe en `Cacas.py`, sin portar)
+- Narrativa IA generada dentro de la app (existe con Groq en `Cacas.py`). De
+  momento el admin de un viaje finalizado copia un prompt con los datos
+  reales (`gotita-app/src/lib/reporte.ts`) y lo pega en la IA que quiera:
+  la app es una SPA estática sin backend y no puede llevar una clave de API.
+- Que sólo el admin pueda finalizar se comprueba en la pantalla, no en RLS
+  (cualquier autenticado puede escribir cualquier viaje, igual que hoy).
 - Login con Google (requiere configurarlo en Google Cloud Console y Supabase)
 
 ## Estilo

@@ -68,11 +68,11 @@ describe('Mis viajes', () => {
 
     expect(screen.getByText('Cangas')).toBeTruthy();
     expect(screen.getByText('Oktoberfest')).toBeTruthy();
-    // No basta con que exista una insignia "Activo" en algún sitio de la
+    // No basta con que exista una insignia "Viendo" en algún sitio de la
     // pantalla: tiene que colgar de la tarjeta correcta. Contar sólo el
     // total dejaría pasar la insignia congelada en la tarjeta equivocada.
-    expect(within(screen.getByTestId('viaje-1')).getByText('Activo')).toBeTruthy();
-    expect(within(screen.getByTestId('viaje-2')).queryByText('Activo')).toBeNull();
+    expect(within(screen.getByTestId('viaje-1')).getByText('Viendo')).toBeTruthy();
+    expect(within(screen.getByTestId('viaje-2')).queryByText('Viendo')).toBeNull();
   });
 
   it('tocar un viaje distinto mueve la insignia a su tarjeta y navega a Mi Viaje', async () => {
@@ -85,8 +85,8 @@ describe('Mis viajes', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/viaje');
-    expect(within(screen.getByTestId('viaje-2')).getByText('Activo')).toBeTruthy();
-    expect(within(screen.getByTestId('viaje-1')).queryByText('Activo')).toBeNull();
+    expect(within(screen.getByTestId('viaje-2')).getByText('Viendo')).toBeTruthy();
+    expect(within(screen.getByTestId('viaje-1')).queryByText('Viendo')).toBeNull();
   });
 
   it('sin viajes, enseña el estado vacío y no una lista rota', async () => {
@@ -96,7 +96,7 @@ describe('Mis viajes', () => {
     });
 
     expect(screen.getByText('Todavía no estás en ningún viaje')).toBeTruthy();
-    expect(screen.queryByText('Activo')).toBeNull();
+    expect(screen.queryByText('Viendo')).toBeNull();
   });
 
   it('siempre ofrece crear o unirse, haya o no viajes', async () => {
@@ -106,5 +106,33 @@ describe('Mis viajes', () => {
 
     expect(screen.getByText('Crear un viaje')).toBeTruthy();
     expect(screen.getByText('Unirme con un código')).toBeTruthy();
+  });
+
+  it('un viaje finalizado enseña su insignia, y "Viendo" no lo tapa', async () => {
+    const finalizado = { ...viaje2, activo: false, fecha_finalizacion: '2026-09-10' };
+    mockCargarMisViajes.mockResolvedValue([viaje1, finalizado]);
+    await act(async () => {
+      renderPantalla();
+    });
+
+    expect(within(screen.getByTestId('viaje-2')).getByText('Finalizado')).toBeTruthy();
+    // El activo de verdad (viaje1) no lleva la insignia de finalizado.
+    expect(within(screen.getByTestId('viaje-1')).queryByText('Finalizado')).toBeNull();
+  });
+
+  it('elegir el finalizado y verlo también "Viendo": las dos insignias conviven', async () => {
+    const finalizado = { ...viaje2, activo: false, fecha_finalizacion: '2026-09-10' };
+    mockCargarMisViajes.mockResolvedValue([viaje1, finalizado]);
+    await act(async () => {
+      renderPantalla();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('viaje-2'));
+    });
+
+    const tarjeta = within(screen.getByTestId('viaje-2'));
+    expect(tarjeta.getByText('Viendo')).toBeTruthy();
+    expect(tarjeta.getByText('Finalizado')).toBeTruthy();
   });
 });

@@ -30,6 +30,8 @@ const mockCargarMisViajes = jest.fn();
 const mockModificarEvento = jest.fn();
 const mockCopiarCodigo = jest.fn();
 const mockCompartirCodigo = jest.fn();
+const mockCopiarTexto = jest.fn();
+const mockFinalizarViaje = jest.fn();
 
 // viaje.tsx hace `e instanceof ConflictoDeConcurrencia`, así que el mock del
 // módulo tiene que exportar y lanzar la misma clase o ese `catch` nunca entra.
@@ -45,6 +47,7 @@ jest.mock('@/lib/viajes', () => {
   return {
     cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
     modificarEvento: (...args: unknown[]) => mockModificarEvento(...args),
+    finalizarViaje: (...args: unknown[]) => mockFinalizarViaje(...args),
     ConflictoDeConcurrencia,
   };
 });
@@ -52,6 +55,7 @@ jest.mock('@/lib/viajes', () => {
 jest.mock('@/lib/compartir', () => ({
   copiarCodigo: (...args: unknown[]) => mockCopiarCodigo(...args),
   compartirCodigo: (...args: unknown[]) => mockCompartirCodigo(...args),
+  copiarTexto: (...args: unknown[]) => mockCopiarTexto(...args),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -166,6 +170,12 @@ beforeEach(() => {
   mockModificarEvento.mockReset();
   mockCopiarCodigo.mockReset().mockResolvedValue(undefined);
   mockCompartirCodigo.mockReset().mockResolvedValue('compartido');
+  mockCopiarTexto.mockReset().mockResolvedValue(undefined);
+  mockFinalizarViaje.mockReset().mockResolvedValue({
+    ...viajeBase,
+    activo: false,
+    fecha_finalizacion: '2026-09-14T10:00:00.000Z',
+  });
   servidorDeMentira(3);
 });
 
@@ -343,6 +353,102 @@ describe('código del viaje: copiar y compartir', () => {
     await pulsar(screen.getByLabelText('Compartir código del viaje'));
 
     expect(screen.queryByText('Código copiado')).toBeNull();
+  });
+});
+
+describe('finalizar viaje', () => {
+  const FINALIZADO = { ...viajeBase, activo: false, fecha_finalizacion: '2026-09-14T10:00:00.000Z' };
+
+  it('el admin ve "Finalizar viaje"', async () => {
+    await renderPantalla();
+    expect(screen.getByLabelText('Finalizar viaje')).toBeTruthy();
+  });
+
+  it('quien no es admin no ve el botón', async () => {
+    mockCargarMisViajes.mockResolvedValue([{ ...viajeBase, admin: 'OTRO' }]);
+    await renderPantalla();
+    expect(screen.queryByLabelText('Finalizar viaje')).toBeNull();
+  });
+
+  it('pulsarlo pide confirmación y no finaliza todavía', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Finalizar viaje'));
+
+    expect(screen.getByText('¿Finalizar el viaje?')).toBeTruthy();
+    expect(mockFinalizarViaje).not.toHaveBeenCalled();
+  });
+
+  it('cancelar no finaliza nada', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Finalizar viaje'));
+    await pulsar(screen.getByLabelText('Cancelar'));
+
+    expect(mockFinalizarViaje).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Sumar uno a Cacas')).toBeTruthy();
+  });
+
+  it('confirmar finaliza, quita +/− y avisa con la fecha', async () => {
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Finalizar viaje'));
+    await armar();
+    await pulsar(screen.getByLabelText('Sí, finalizar'));
+
+    expect(mockFinalizarViaje).toHaveBeenCalledWith(1);
+    expect(screen.queryByLabelText('Sumar uno a Cacas')).toBeNull();
+    expect(screen.queryByLabelText('Quitar uno de Cacas')).toBeNull();
+    expect(screen.queryByLabelText('Finalizar viaje')).toBeNull();
+    expect(screen.getByText(/Viaje finalizado el 14 de septiembre de 2026/)).toBeTruthy();
+    // Los contadores propios se siguen viendo, sólo que ya no se tocan.
+    expect(screen.getByText('3')).toBeTruthy();
+  });
+
+  it('si finalizar falla, lo dice y el viaje sigue abierto', async () => {
+    mockFinalizarViaje.mockRejectedValue(new Error('Fallo de red simulado'));
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Finalizar viaje'));
+    await armar();
+    await pulsar(screen.getByLabelText('Sí, finalizar'));
+
+    expect(screen.getByText('Fallo de red simulado')).toBeTruthy();
+    expect(screen.getByLabelText('Sumar uno a Cacas')).toBeTruthy();
+  });
+
+  it('un viaje ya finalizado es de sólo lectura también para quien no es admin', async () => {
+    mockCargarMisViajes.mockResolvedValue([{ ...FINALIZADO, admin: 'OTRO' }]);
+    await renderPantalla();
+
+    expect(screen.queryByLabelText('Sumar uno a Cacas')).toBeNull();
+    expect(screen.queryByLabelText('Quitar uno de Cacas')).toBeNull();
+    expect(screen.queryByLabelText('Copiar clasificación en texto')).toBeNull();
+  });
+
+  it('el admin de un viaje finalizado copia la clasificación en texto', async () => {
+    mockCargarMisViajes.mockResolvedValue([FINALIZADO]);
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Copiar clasificación en texto'));
+
+    expect(mockCopiarTexto).toHaveBeenCalledTimes(1);
+    const texto = mockCopiarTexto.mock.calls[0][0] as string;
+    expect(texto).toContain('Clasificación final de "Cangas"');
+    expect(texto).toContain('Cacas: 1º Dudu (3)');
+    expect(screen.getByText('Clasificación copiada')).toBeTruthy();
+  });
+
+  it('y copia un prompt para IA que lleva los datos reales', async () => {
+    mockCargarMisViajes.mockResolvedValue([FINALIZADO]);
+    await renderPantalla();
+
+    await pulsar(screen.getByLabelText('Copiar prompt para IA'));
+
+    const prompt = mockCopiarTexto.mock.calls[0][0] as string;
+    expect(prompt).toContain('No inventes datos');
+    expect(prompt).toContain('Cacas: 1º Dudu (3)');
+    expect(screen.getByText('Prompt copiado: pégalo en tu IA favorita')).toBeTruthy();
   });
 });
 

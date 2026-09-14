@@ -16,10 +16,15 @@ export type UsuarioViaje = {
 export type Viaje = {
   id: number;
   nombre: string;
-  /** UUID de quien lo creó. */
+  /** UUID de quien lo creó. Sólo el admin puede finalizar el viaje. */
   admin: string;
   fecha_creacion: string;
+  /** false = finalizado: nadie puede sumar ni restar, la clasificación se
+   * queda fija. Quien ya estaba dentro lo sigue viendo (ver
+   * `cargarMisViajes`, que ya no filtra por esto). */
   activo: boolean;
+  /** Sólo tiene valor cuando `activo` es false. */
+  fecha_finalizacion: string | null;
   categorias: string[];
   /** Clave = user.id de Supabase. Nunca el nombre. */
   usuarios: Record<string, UsuarioViaje>;
@@ -33,9 +38,15 @@ export async function cargarUnViaje(viajeId: number): Promise<Viaje | null> {
   return (data as Viaje) ?? null;
 }
 
-/** Viajes activos en los que participa este usuario. */
+/**
+ * Todos los viajes (activos Y finalizados) en los que participa este
+ * usuario. Antes filtraba `activo=true`: un viaje finalizado desaparecía de
+ * "Mis viajes" y de "Mi Viaje" en cuanto se cerraba, que es justo lo
+ * contrario de lo pedido — quien ya estaba dentro tiene que poder seguir
+ * viendo la clasificación final.
+ */
 export async function cargarMisViajes(userId: string): Promise<Viaje[]> {
-  const { data, error } = await supabase.from('viajes').select('*').eq('activo', true);
+  const { data, error } = await supabase.from('viajes').select('*');
   if (error) throw error;
   return ((data ?? []) as Viaje[]).filter((viaje) => userId in (viaje.usuarios ?? {}));
 }
@@ -142,15 +153,16 @@ export async function unirseAViaje(
  * El nombre para mostrar es una copia dentro del JSON `usuarios` de cada
  * viaje (ver el comentario de `UsuarioViaje.nombre`): cambiarlo sólo en la
  * cuenta (`auth.updateUser`) no actualiza la clasificación de los viajes en
- * los que ya está metido. Se limita a los viajes ACTIVOS porque
- * `cargarMisViajes` sólo trae esos; los finalizados se quedan con el nombre
- * que tenían en su momento, que es razonable como registro histórico.
+ * los que ya está metido. Se limita a los viajes ACTIVOS: los finalizados se
+ * quedan con el nombre que tenían en su momento, como registro histórico.
+ * `cargarMisViajes` trae también los finalizados (para poder seguir viéndolos),
+ * así que el filtro tiene que estar aquí; antes lo daba gratis esa consulta.
  */
 export async function actualizarNombreEnMisViajes(
   userId: string,
   nuevoNombre: string
 ): Promise<void> {
-  const mios = await cargarMisViajes(userId);
+  const mios = (await cargarMisViajes(userId)).filter((v) => v.activo);
   // allSettled, no all: esto se llama después de que el nombre de la CUENTA
   // ya se ha guardado con éxito. Si un solo viaje fallase al escribir con
   // Promise.all, el error de esa fila taparía que la cuenta y el resto de
@@ -174,10 +186,11 @@ export async function actualizarNombreEnMisViajes(
  * Mismo motivo: `avatarUrl` es una copia por viaje (ver el comentario en
  * `UsuarioViaje`), así que subir una foto nueva y guardarla en la cuenta
  * (`actualizarAvatar` de `lib/auth`) no basta para que la clasificación de
- * los viajes ya existentes la enseñe.
+ * los viajes ya existentes la enseñe. Igual que el nombre, sólo en los
+ * viajes activos: un viaje finalizado es un registro cerrado.
  */
 export async function actualizarAvatarEnMisViajes(userId: string, nuevaUrl: string): Promise<void> {
-  const mios = await cargarMisViajes(userId);
+  const mios = (await cargarMisViajes(userId)).filter((v) => v.activo);
   await Promise.allSettled(
     mios.map((v) => {
       const usuario = v.usuarios?.[userId];
@@ -236,6 +249,11 @@ export async function modificarEvento(
 ): Promise<Viaje> {
   const viaje = await cargarUnViaje(viajeId);
   if (!viaje) throw new Error('El viaje ya no existe');
+  // La pantalla oculta +/− en cuanto ve `activo=false`, pero otro móvil puede
+  // tener todavía el viaje pintado como activo (no se ha enterado del cierre)
+  // y seguir sumando. Esta fila recién leída del servidor es la única que
+  // sabe la verdad, así que el cierre se hace cumplir aquí.
+  if (!viaje.activo) throw new Error('Este viaje ya está finalizado: la clasificación no se puede tocar.');
 
   const usuarioActual = viaje.usuarios?.[userId];
   if (!usuarioActual) throw new Error('No estás apuntado a este viaje');
@@ -257,4 +275,27 @@ export async function modificarEvento(
   const { error } = await supabase.from('viajes').update({ usuarios }).eq('id', viajeId);
   if (error) throw error;
   return { ...viaje, usuarios };
+}
+
+/**
+ * Cierra el viaje: nadie podrá sumar ni restar más (viaje.tsx oculta los
+ * botones +/− en cuanto `activo` es false), la clasificación se queda fija.
+ * Quien ya estaba dentro lo sigue viendo — `cargarMisViajes` ya no filtra
+ * por `activo`, así que desaparecer de la lista no es un riesgo.
+ *
+ * No hay comprobación de "sólo el admin" aquí ni en RLS: el modelo de
+ * confianza de este proyecto (ver `politicas-rls.sql`) ya es "cualquier
+ * autenticado puede escribir cualquier viaje", así que la comprobación de
+ * quién puede pulsar el botón vive en la pantalla (`viaje.admin === userId`),
+ * igual que ya pasa con sumar/restar.
+ */
+export async function finalizarViaje(viajeId: number): Promise<Viaje> {
+  const { data, error } = await supabase
+    .from('viajes')
+    .update({ activo: false, fecha_finalizacion: new Date().toISOString() })
+    .eq('id', viajeId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Viaje;
 }

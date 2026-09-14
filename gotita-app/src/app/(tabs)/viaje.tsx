@@ -17,12 +17,14 @@ import { DialogoConfirmar } from '@/componentes/DialogoConfirmar';
 import { Desplegable } from '@/componentes/Desplegable';
 import { CATEGORIAS } from '@/lib/categorias';
 import { useAuth } from '@/lib/auth';
-import { compartirCodigo, copiarCodigo } from '@/lib/compartir';
+import { compartirCodigo, copiarCodigo, copiarTexto } from '@/lib/compartir';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
 import { IconoDe, ICONOS } from '@/lib/iconos';
+import { formatearFecha, promptNarrativaIA, textoClasificacion } from '@/lib/reporte';
 import { radio, tema } from '@/lib/tema';
-import { ConflictoDeConcurrencia, modificarEvento } from '@/lib/viajes';
+import { ConflictoDeConcurrencia, finalizarViaje, modificarEvento } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
+import type { TextosConfirmacion } from '@/lib/confirmacion';
 
 /**
  * El viaje activo y sus contadores. Cambiar de viaje o gestionar la lista
@@ -40,6 +42,13 @@ export default function PantallaViaje() {
   // Aviso corto tras copiar o compartir el código ("Código copiado"). null =
   // no hay nada que enseñar.
   const [avisoCodigo, setAvisoCodigo] = useState<string | null>(null);
+  // Confirmación de "Finalizar viaje" (sólo el admin la ve). Reusa
+  // DialogoConfirmar con unos textos propios, no los de restar un evento.
+  const [porFinalizar, setPorFinalizar] = useState(false);
+  const [finalizando, setFinalizando] = useState(false);
+  // Aviso corto tras copiar la clasificación o el prompt de IA.
+  const [avisoReporte, setAvisoReporte] = useState<string | null>(null);
+  const avisoReporteTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clasificación cerrada por defecto en sus tres niveles (la sección
   // entera, cada categoría, cada evento dentro de ella): que un primer
@@ -68,6 +77,7 @@ export default function PantallaViaje() {
   useEffect(() => {
     return () => {
       if (avisoCodigoTimeout.current) clearTimeout(avisoCodigoTimeout.current);
+      if (avisoReporteTimeout.current) clearTimeout(avisoReporteTimeout.current);
     };
   }, []);
 
@@ -87,6 +97,52 @@ export default function PantallaViaje() {
     if (!viaje) return;
     const resultado = await compartirCodigo(viaje.nombre, viaje.codigo);
     if (resultado === 'copiado') mostrarAvisoCodigo('Código copiado');
+  }
+
+  function mostrarAvisoReporte(texto: string) {
+    setAvisoReporte(texto);
+    if (avisoReporteTimeout.current) clearTimeout(avisoReporteTimeout.current);
+    avisoReporteTimeout.current = setTimeout(() => setAvisoReporte(null), 2500);
+  }
+
+  async function alCopiarClasificacion() {
+    if (!viaje) return;
+    await copiarTexto(textoClasificacion(viaje));
+    mostrarAvisoReporte('Clasificación copiada');
+  }
+
+  async function alCopiarPrompt() {
+    if (!viaje) return;
+    await copiarTexto(promptNarrativaIA(viaje));
+    mostrarAvisoReporte('Prompt copiado: pégalo en tu IA favorita');
+  }
+
+  const textosFinalizar: TextosConfirmacion = {
+    titulo: '¿Finalizar el viaje?',
+    mensaje:
+      'Nadie podrá sumar ni restar más, ni tú. La clasificación se queda fija y todos la seguirán viendo.',
+    etiquetaConfirmar: 'Sí, finalizar',
+    etiquetaCancelar: 'Cancelar',
+    icono: ICONOS.trofeo,
+  };
+
+  function alPedirFinalizar() {
+    setPorFinalizar(true);
+  }
+
+  async function alConfirmarFinalizar() {
+    setPorFinalizar(false);
+    if (!viaje) return;
+    setFinalizando(true);
+    try {
+      const actualizado = await finalizarViaje(viaje.id);
+      setViajes((previos) => previos.map((v) => (v.id === actualizado.id ? actualizado : v)));
+      setError(null);
+    } catch (e) {
+      mostrarError(e instanceof Error ? e.message : 'No se ha podido finalizar el viaje.');
+    } finally {
+      setFinalizando(false);
+    }
   }
 
   /** Sube al principio, que es donde vive el aviso de error. Sin esto, un
@@ -266,6 +322,17 @@ export default function PantallaViaje() {
         {viaje ? <Text style={estilos.nombreViaje}>{viaje.nombre}</Text> : null}
       </View>
 
+      {viaje && !viaje.activo ? (
+        <View style={estilos.avisoFinalizado}>
+          <IconoDe spec={ICONOS.trofeo} size={16} color={tema.textoTenue} />
+          <Text style={estilos.avisoFinalizadoTexto}>
+            Viaje finalizado
+            {viaje.fecha_finalizacion ? ` el ${formatearFecha(viaje.fecha_finalizacion)}` : ''}. La
+            clasificación se queda fija.
+          </Text>
+        </View>
+      ) : null}
+
       {error ? <Text style={estilos.error}>{error}</Text> : null}
 
       {!viaje ? (
@@ -306,26 +373,33 @@ export default function PantallaViaje() {
                         <Text style={estilos.tarjetaNombre}>{evento.nombre}</Text>
                         <Text style={estilos.tarjetaCuenta}>{cuenta}</Text>
                       </View>
-                      <Pressable
-                        onPress={() => alPedirResta(clave, cuenta)}
-                        disabled={cuenta === 0}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Quitar uno de ${evento.nombre}`}
-                        style={({ pressed }) => [
-                          estilos.botonMenos,
-                          cuenta === 0 && estilos.botonDeshabilitado,
-                          pressed && estilos.pulsado,
-                        ]}
-                        hitSlop={6}>
-                        <Text style={estilos.botonMenosTexto}>−</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => alPulsar(clave, 1)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Sumar uno a ${evento.nombre}`}
-                        style={({ pressed }) => [estilos.botonMas, pressed && estilos.pulsado]}>
-                        <Text style={estilos.botonMasTexto}>+</Text>
-                      </Pressable>
+                      {/* Viaje finalizado: sólo lectura para todos, admin
+                          incluido. La clasificación se queda fija; no hay
+                          "sólo el admin puede seguir sumando", nadie suma. */}
+                      {viaje.activo ? (
+                        <>
+                          <Pressable
+                            onPress={() => alPedirResta(clave, cuenta)}
+                            disabled={cuenta === 0}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Quitar uno de ${evento.nombre}`}
+                            style={({ pressed }) => [
+                              estilos.botonMenos,
+                              cuenta === 0 && estilos.botonDeshabilitado,
+                              pressed && estilos.pulsado,
+                            ]}
+                            hitSlop={6}>
+                            <Text style={estilos.botonMenosTexto}>−</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => alPulsar(clave, 1)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Sumar uno a ${evento.nombre}`}
+                            style={({ pressed }) => [estilos.botonMas, pressed && estilos.pulsado]}>
+                            <Text style={estilos.botonMasTexto}>+</Text>
+                          </Pressable>
+                        </>
+                      ) : null}
                     </View>
                   );
                 })}
@@ -410,6 +484,53 @@ export default function PantallaViaje() {
             </Desplegable>
           </View>
 
+          {viaje.activo && viaje.admin === userId ? (
+            <View style={estilos.seccion}>
+              <Pressable
+                onPress={alPedirFinalizar}
+                disabled={finalizando}
+                accessibilityRole="button"
+                accessibilityLabel="Finalizar viaje"
+                style={({ pressed }) => [
+                  estilos.botonFinalizar,
+                  pressed && estilos.pulsado,
+                  finalizando && estilos.botonDeshabilitado,
+                ]}>
+                {finalizando ? (
+                  <ActivityIndicator color={tema.peligro} />
+                ) : (
+                  <Text style={estilos.botonFinalizarTexto}>Finalizar viaje</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
+
+          {!viaje.activo && viaje.admin === userId ? (
+            <View style={estilos.seccion}>
+              <View style={estilos.tituloSeccionFila}>
+                <IconoDe spec={ICONOS.compartir} size={18} color={tema.texto} />
+                <Text style={estilos.tituloSeccion}>Compartir el resultado</Text>
+              </View>
+              <Pressable
+                onPress={alCopiarClasificacion}
+                accessibilityRole="button"
+                accessibilityLabel="Copiar clasificación en texto"
+                style={({ pressed }) => [estilos.botonReporte, pressed && estilos.pulsado]}>
+                <IconoDe spec={ICONOS.copiar} size={16} color={tema.acento} />
+                <Text style={estilos.botonReporteTexto}>Copiar clasificación</Text>
+              </Pressable>
+              <Pressable
+                onPress={alCopiarPrompt}
+                accessibilityRole="button"
+                accessibilityLabel="Copiar prompt para IA"
+                style={({ pressed }) => [estilos.botonReporte, pressed && estilos.pulsado]}>
+                <IconoDe spec={ICONOS.ia} size={16} color={tema.acento} />
+                <Text style={estilos.botonReporteTexto}>Copiar prompt para una IA</Text>
+              </Pressable>
+              {avisoReporte ? <Text style={estilos.avisoCodigo}>{avisoReporte}</Text> : null}
+            </View>
+          ) : null}
+
           <View style={estilos.pie}>
             <View style={estilos.filaCodigo}>
               <Pressable
@@ -441,6 +562,13 @@ export default function PantallaViaje() {
         alConfirmar={alConfirmarResta}
         alCancelar={() => setPorRestar(null)}
       />
+
+      <DialogoConfirmar
+        visible={porFinalizar}
+        textos={textosFinalizar}
+        alConfirmar={alConfirmarFinalizar}
+        alCancelar={() => setPorFinalizar(false)}
+      />
     </ScrollView>
   );
 }
@@ -454,6 +582,17 @@ const estilos = StyleSheet.create({
   saludoFila: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   saludo: { color: tema.textoTenue, fontSize: 15, fontWeight: '600' },
   nombreViaje: { color: tema.texto, fontSize: 28, fontWeight: '800', marginTop: 2 },
+
+  avisoFinalizado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    backgroundColor: tema.fondoElevado,
+    borderRadius: radio.sm,
+    padding: 12,
+  },
+  avisoFinalizadoTexto: { color: tema.textoTenue, fontSize: 13, flex: 1, lineHeight: 18 },
 
   error: {
     color: tema.peligro,
@@ -603,4 +742,28 @@ const estilos = StyleSheet.create({
   codigo: { color: tema.textoTenue, fontSize: 14, letterSpacing: 0.5 },
   botonCompartirCodigo: { padding: 4 },
   avisoCodigo: { color: tema.acento, fontSize: 13, fontWeight: '700' },
+
+  botonFinalizar: {
+    borderRadius: radio.md,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: tema.peligro,
+  },
+  botonFinalizarTexto: { color: tema.peligro, fontSize: 15, fontWeight: '800' },
+
+  botonReporte: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: tema.tarjeta,
+    borderWidth: 1,
+    borderColor: tema.borde,
+    borderRadius: radio.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  botonReporteTexto: { color: tema.texto, fontSize: 15, fontWeight: '700' },
 });

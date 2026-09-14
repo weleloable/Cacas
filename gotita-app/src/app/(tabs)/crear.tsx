@@ -75,6 +75,26 @@ export default function Crear() {
     setTimeout(() => setCopiado(false), 2000);
   }
 
+  /**
+   * Bug real (reproducido con Playwright contra la app de verdad): las
+   * pestañas no se desmontan al navegar entre ellas (ver notas de
+   * navegación en CLAUDE.md), así que `router.replace('/viaje')` por sí solo
+   * cambia la pestaña activa pero deja esta pantalla, con `creado` todavía
+   * puesto, esperando debajo. La próxima vez que se vuelve a "Crear viaje"
+   * reaparece la pantalla de éxito del viaje anterior (código incluido) en
+   * vez de un formulario en blanco — hacía falta cerrar la app entera para
+   * que se olvidara. Se resetea el estado local ANTES de navegar, no
+   * después: así ya está limpio cuando se vuelva a montar esta pestaña.
+   */
+  function alEmpezarAContar() {
+    setCreado(null);
+    setCopiado(false);
+    setNombre('');
+    setSeleccionadas(Object.keys(CATEGORIAS));
+    setError(null);
+    router.replace('/viaje');
+  }
+
   // Una vez creado, la pantalla se convierte en "comparte este código".
   if (creado) {
     return (
@@ -92,7 +112,7 @@ export default function Crear() {
           <Text style={estilos.codigoPista}>{copiado ? '¡Copiado!' : 'Tocar para copiar'}</Text>
         </Pressable>
 
-        <Pressable style={estilos.boton} onPress={() => router.replace('/viaje')}>
+        <Pressable style={estilos.boton} onPress={alEmpezarAContar}>
           <Text style={estilos.botonTexto}>Empezar a contar</Text>
         </Pressable>
       </ScrollView>
@@ -109,7 +129,7 @@ export default function Crear() {
           style={estilos.input}
           value={nombre}
           onChangeText={setNombre}
-          placeholder="Oktoberfest 2026"
+          placeholder="Navidades Leon"
           placeholderTextColor={tema.textoTenue}
           autoCapitalize="sentences"
         />

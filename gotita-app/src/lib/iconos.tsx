@@ -112,4 +112,6 @@ export const ICONOS = {
   imagen: { fuente: 'feather', nombre: 'image' } as IconoSpec,
   chevronAbajo: { fuente: 'feather', nombre: 'chevron-down' } as IconoSpec,
   chevronDerecha: { fuente: 'feather', nombre: 'chevron-right' } as IconoSpec,
+  copiar: { fuente: 'feather', nombre: 'copy' } as IconoSpec,
+  ia: { fuente: 'mci', nombre: 'robot-outline' } as IconoSpec,
 } satisfies Record<string, IconoSpec>;
