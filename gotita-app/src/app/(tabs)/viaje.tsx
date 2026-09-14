@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -19,7 +20,7 @@ import { compartirCodigo, copiarCodigo } from '@/lib/compartir';
 import { sePuedeRestar, textosDeConfirmacion } from '@/lib/confirmacion';
 import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
-import { ConflictoDeConcurrencia, modificarEvento, totalDeUsuarioEnCategoria } from '@/lib/viajes';
+import { ConflictoDeConcurrencia, modificarEvento } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
 
 /**
@@ -202,22 +203,26 @@ export default function PantallaViaje() {
   }
 
   const misEventos = viaje?.usuarios?.[userId]?.eventos ?? {};
-  // Una clasificación por categoría (Gotitas, Bebidas...), no un único total
-  // que mezcla cacas con cervezas.
+  // Una clasificación por CADA EVENTO (Cacas, Pises, Cerveza...), agrupadas
+  // bajo su categoría (Gotitas, Bebidas...), no un total único que mezcla
+  // cacas con cervezas ni uno por categoría que mezcla cacas con pises.
   const clasificacionPorCategoria = viaje
     ? (viaje.categorias ?? [])
         .map((nombreCategoria) => {
           const categoria = CATEGORIAS[nombreCategoria];
           if (!categoria) return null;
-          const clavesEventos = Object.keys(categoria.eventos);
-          const filas = Object.entries(viaje.usuarios ?? {})
-            .map(([clave, usuario]) => ({
-              clave,
-              nombre: usuario.nombre,
-              total: totalDeUsuarioEnCategoria(usuario, clavesEventos),
-            }))
-            .sort((a, b) => b.total - a.total);
-          return { nombreCategoria, icono: categoria.icono, filas };
+          const eventos = Object.entries(categoria.eventos).map(([claveEvento, infoEvento]) => {
+            const filas = Object.entries(viaje.usuarios ?? {})
+              .map(([clave, usuario]) => ({
+                clave,
+                nombre: usuario.nombre,
+                avatarUrl: usuario.avatarUrl ?? null,
+                total: usuario.eventos?.[claveEvento] ?? 0,
+              }))
+              .sort((a, b) => b.total - a.total);
+            return { claveEvento, nombreEvento: infoEvento.nombre, iconoEvento: infoEvento.icono, filas };
+          });
+          return { nombreCategoria, icono: categoria.icono, eventos };
         })
         .filter((entrada): entrada is NonNullable<typeof entrada> => entrada !== null)
     : [];
@@ -309,22 +314,46 @@ export default function PantallaViaje() {
             );
           })}
 
-          {clasificacionPorCategoria.map(({ nombreCategoria, icono, filas }) => (
+          {clasificacionPorCategoria.map(({ nombreCategoria, icono, eventos }) => (
             <View key={nombreCategoria} style={estilos.seccion}>
               <View style={estilos.tituloSeccionFila}>
                 <IconoDe spec={ICONOS.trofeo} size={18} color={tema.texto} />
                 <Text style={estilos.tituloSeccion}>Clasificación · {nombreCategoria}</Text>
                 <IconoDe spec={icono} size={16} color={tema.textoTenue} />
               </View>
-              {filas.map((fila, indice) => (
-                <View key={fila.clave} style={estilos.filaRanking}>
-                  <Text style={estilos.puesto}>{indice + 1}</Text>
-                  <Text
-                    style={[estilos.nombreRanking, fila.clave === userId && estilos.nombreRankingYo]}
-                    numberOfLines={1}>
-                    {fila.nombre}
-                  </Text>
-                  <Text style={estilos.totalRanking}>{fila.total}</Text>
+              {eventos.map(({ claveEvento, nombreEvento, iconoEvento, filas }) => (
+                <View key={claveEvento} style={estilos.subseccion}>
+                  <View style={estilos.tituloSubseccionFila}>
+                    <IconoDe spec={iconoEvento} size={14} color={tema.textoTenue} />
+                    <Text style={estilos.tituloSubseccion}>{nombreEvento}</Text>
+                  </View>
+                  {filas.map((fila, indice) => (
+                    <View key={fila.clave} style={estilos.filaRanking}>
+                      <Text style={estilos.puesto}>{indice + 1}</Text>
+                      <View style={estilos.avatarMini}>
+                        {fila.avatarUrl ? (
+                          <Image
+                            source={{ uri: fila.avatarUrl }}
+                            style={estilos.avatarMiniFoto}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <Text style={estilos.avatarMiniTexto}>
+                            {(fila.nombre.trim()[0] || '?').toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          estilos.nombreRanking,
+                          fila.clave === userId && estilos.nombreRankingYo,
+                        ]}
+                        numberOfLines={1}>
+                        {fila.nombre}
+                      </Text>
+                      <Text style={estilos.totalRanking}>{fila.total}</Text>
+                    </View>
+                  ))}
                 </View>
               ))}
             </View>
@@ -441,17 +470,40 @@ const estilos = StyleSheet.create({
   botonMasTexto: { color: '#04121C', fontSize: 32, fontWeight: '800', lineHeight: 36 },
   pulsado: { opacity: 0.7, transform: [{ scale: 0.94 }] },
 
+  subseccion: { marginTop: 14 },
+  tituloSubseccionFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  tituloSubseccion: { color: tema.textoTenue, fontSize: 13, fontWeight: '700' },
+
   filaRanking: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 12,
+    gap: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: tema.fondoElevado,
     borderRadius: radio.md,
     marginBottom: 8,
   },
   puesto: { color: tema.textoTenue, fontSize: 15, fontWeight: '800', width: 18 },
+  avatarMini: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: tema.tarjeta,
+    borderWidth: 1,
+    borderColor: tema.borde,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarMiniFoto: { width: '100%', height: '100%' },
+  avatarMiniTexto: { color: tema.acento, fontSize: 12, fontWeight: '800' },
   nombreRanking: { color: tema.texto, fontSize: 16, flex: 1 },
   nombreRankingYo: { fontWeight: '800', color: tema.acento },
   totalRanking: { color: tema.texto, fontSize: 18, fontWeight: '800' },

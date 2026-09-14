@@ -22,7 +22,7 @@ import { crearViaje, type Viaje } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
 
 export default function Crear() {
-  const { userId, nombreUsuario } = useAuth();
+  const { userId, nombreUsuario, avatarUrl } = useAuth();
   const { setViajes, setViajeActivoId } = useViajes();
 
   const [nombre, setNombre] = useState('');
@@ -53,7 +53,7 @@ export default function Crear() {
     setEnviando(true);
     setError(null);
     try {
-      const viaje = await crearViaje(nombre.trim(), seleccionadas, userId, nombreUsuario);
+      const viaje = await crearViaje(nombre.trim(), seleccionadas, userId, nombreUsuario, avatarUrl);
       setCreado(viaje);
       // Se añade directo al contexto compartido y se marca activo, sin
       // esperar a un recargar(): así "Mi Viaje" ya lo tiene en cuanto se

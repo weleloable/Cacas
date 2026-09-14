@@ -4,6 +4,12 @@ import { supabase } from './supabase';
 export type UsuarioViaje = {
   /** Nombre para mostrar. Editable sin perder nada, porque la clave es el UUID. */
   nombre: string;
+  /** URL pública del avatar (bucket `avatars`), o null/ausente si no tiene.
+   * Copia guardada aquí por el mismo motivo que `nombre`: la clasificación
+   * necesita la foto de TODOS los participantes, y sólo la cuenta de cada
+   * uno conoce la suya propia (`user_metadata.avatar_url`, no legible entre
+   * usuarios sin una tabla de perfiles públicos que no existe todavía). */
+  avatarUrl?: string | null;
   eventos: Record<string, number>;
 };
 
@@ -85,7 +91,8 @@ export async function crearViaje(
   nombreViaje: string,
   categorias: string[],
   userId: string,
-  nombreUsuario: string
+  nombreUsuario: string,
+  avatarUrl?: string | null
 ): Promise<Viaje> {
   const codigo = await generarCodigoLibre();
 
@@ -96,7 +103,7 @@ export async function crearViaje(
     activo: true,
     categorias,
     usuarios: {
-      [userId]: { nombre: nombreUsuario, eventos: eventosIniciales(categorias) },
+      [userId]: { nombre: nombreUsuario, avatarUrl: avatarUrl ?? null, eventos: eventosIniciales(categorias) },
     },
     codigo,
     reporte_llm: {},
@@ -110,13 +117,18 @@ export async function crearViaje(
 export async function unirseAViaje(
   viaje: Viaje,
   userId: string,
-  nombreUsuario: string
+  nombreUsuario: string,
+  avatarUrl?: string | null
 ): Promise<Viaje> {
   if (viaje.usuarios?.[userId]) return viaje; // Ya estaba dentro.
 
   const usuarios = {
     ...viaje.usuarios,
-    [userId]: { nombre: nombreUsuario, eventos: eventosIniciales(viaje.categorias ?? []) },
+    [userId]: {
+      nombre: nombreUsuario,
+      avatarUrl: avatarUrl ?? null,
+      eventos: eventosIniciales(viaje.categorias ?? []),
+    },
   };
 
   const { error } = await supabase.from('viajes').update({ usuarios }).eq('id', viaje.id);
@@ -151,6 +163,26 @@ export async function actualizarNombreEnMisViajes(
       const usuario = v.usuarios?.[userId];
       if (!usuario || usuario.nombre === nuevoNombre) return Promise.resolve();
       const usuarios = { ...v.usuarios, [userId]: { ...usuario, nombre: nuevoNombre } };
+      return supabase.from('viajes').update({ usuarios }).eq('id', v.id);
+    })
+  );
+}
+
+/**
+ * Igual que `actualizarNombreEnMisViajes`, pero para la foto de perfil.
+ *
+ * Mismo motivo: `avatarUrl` es una copia por viaje (ver el comentario en
+ * `UsuarioViaje`), así que subir una foto nueva y guardarla en la cuenta
+ * (`actualizarAvatar` de `lib/auth`) no basta para que la clasificación de
+ * los viajes ya existentes la enseñe.
+ */
+export async function actualizarAvatarEnMisViajes(userId: string, nuevaUrl: string): Promise<void> {
+  const mios = await cargarMisViajes(userId);
+  await Promise.allSettled(
+    mios.map((v) => {
+      const usuario = v.usuarios?.[userId];
+      if (!usuario || usuario.avatarUrl === nuevaUrl) return Promise.resolve();
+      const usuarios = { ...v.usuarios, [userId]: { ...usuario, avatarUrl: nuevaUrl } };
       return supabase.from('viajes').update({ usuarios }).eq('id', v.id);
     })
   );
@@ -225,17 +257,4 @@ export async function modificarEvento(
   const { error } = await supabase.from('viajes').update({ usuarios }).eq('id', viajeId);
   if (error) throw error;
   return { ...viaje, usuarios };
-}
-
-/**
- * Total de un usuario, restringido a las claves de evento de UNA categoría.
- *
- * La clasificación antes sumaba todos los eventos del viaje en un único
- * número (cacas + pises + cervezas...), lo que no distingue quién bebe más
- * de quién caga más. Se pasa a una clasificación por categoría, así que el
- * total ahora se calcula acotado a las claves de esa categoría, no a todo
- * `usuario.eventos`.
- */
-export function totalDeUsuarioEnCategoria(usuario: UsuarioViaje, clavesEventos: string[]): number {
-  return clavesEventos.reduce((suma, clave) => suma + (usuario.eventos?.[clave] ?? 0), 0);
 }

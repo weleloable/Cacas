@@ -13,6 +13,7 @@ const mockActualizarNombre = jest.fn();
 const mockActualizarAvatar = jest.fn();
 const mockSalir = jest.fn();
 const mockActualizarNombreEnMisViajes = jest.fn();
+const mockActualizarAvatarEnMisViajes = jest.fn();
 const mockCargarMisViajes = jest.fn();
 const mockReplace = jest.fn();
 const mockElegirDeGaleria = jest.fn();
@@ -37,6 +38,7 @@ jest.mock('@/lib/auth', () => ({
 
 jest.mock('@/lib/viajes', () => ({
   actualizarNombreEnMisViajes: (...args: unknown[]) => mockActualizarNombreEnMisViajes(...args),
+  actualizarAvatarEnMisViajes: (...args: unknown[]) => mockActualizarAvatarEnMisViajes(...args),
   cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
 }));
 
@@ -93,6 +95,7 @@ beforeEach(() => {
   mockActualizarNombre.mockReset().mockResolvedValue(undefined);
   mockActualizarAvatar.mockReset().mockResolvedValue(undefined);
   mockActualizarNombreEnMisViajes.mockReset().mockResolvedValue(undefined);
+  mockActualizarAvatarEnMisViajes.mockReset().mockResolvedValue(undefined);
   mockCargarMisViajes.mockReset().mockResolvedValue([]);
   mockSalir.mockReset().mockResolvedValue(undefined);
   mockReplace.mockReset();
@@ -242,6 +245,13 @@ describe('Perfil', () => {
       expect(mockElegirDeGaleria).toHaveBeenCalledTimes(1);
       expect(mockSubirAvatar).toHaveBeenCalledWith(USUARIO, 'file:///foto.jpg');
       expect(mockActualizarAvatar).toHaveBeenCalledWith('https://ejemplo.test/avatars/foto.jpg');
+      // Igual que el nombre: no basta con la cuenta, también tiene que
+      // propagarse a los viajes ya existentes (avatarUrl es una copia por
+      // viaje, no una referencia a la cuenta).
+      expect(mockActualizarAvatarEnMisViajes).toHaveBeenCalledWith(
+        USUARIO,
+        'https://ejemplo.test/avatars/foto.jpg'
+      );
       expect(screen.getByText('Foto de perfil actualizada.')).toBeTruthy();
     });
 
@@ -287,6 +297,22 @@ describe('Perfil', () => {
 
       expect(screen.getByText('bucket no existe')).toBeTruthy();
       expect(mockActualizarAvatar).not.toHaveBeenCalled();
+      expect(screen.queryByText('Foto de perfil actualizada.')).toBeNull();
+    });
+
+    it('si falla sólo la propagación a los viajes, el mensaje deja claro que la foto SÍ se guardó', async () => {
+      mockElegirDeGaleria.mockResolvedValue('file:///foto.jpg');
+      mockActualizarAvatarEnMisViajes.mockRejectedValue(new Error('sin red'));
+      await act(async () => {
+        renderPantalla();
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Elegir foto de perfil de la galería'));
+      });
+
+      expect(mockActualizarAvatar).toHaveBeenCalled(); // sí se llamó, y con éxito
+      expect(screen.getByText(/Se guardó la foto/)).toBeTruthy();
       expect(screen.queryByText('Foto de perfil actualizada.')).toBeNull();
     });
   });

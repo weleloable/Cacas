@@ -3,7 +3,12 @@
  * como hacen los tests de pantalla). Sólo se mockea `supabase`, en el punto
  * exacto donde este módulo habla con la red.
  */
-import { actualizarNombreEnMisViajes, ConflictoDeConcurrencia, modificarEvento } from '@/lib/viajes';
+import {
+  actualizarAvatarEnMisViajes,
+  actualizarNombreEnMisViajes,
+  ConflictoDeConcurrencia,
+  modificarEvento,
+} from '@/lib/viajes';
 
 const USUARIO = '11111111-1111-1111-1111-111111111111';
 const OTRO = '22222222-2222-2222-2222-222222222222';
@@ -16,7 +21,9 @@ function viaje(id: number, nombre: string, eventos: Record<string, number> = { c
     fecha_creacion: '2026-09-01',
     activo: true,
     categorias: ['Gotitas'],
-    usuarios: { [USUARIO]: { nombre: 'Dudu', eventos } },
+    usuarios: {
+      [USUARIO]: { nombre: 'Dudu', avatarUrl: null as string | null, eventos },
+    },
     codigo: `COD-${id}`,
     reporte_llm: null,
   };
@@ -134,5 +141,50 @@ describe('actualizarNombreEnMisViajes', () => {
 
     await expect(actualizarNombreEnMisViajes(USUARIO, 'Eduardo')).resolves.toBeUndefined();
     expect(mockUpdate).toHaveBeenCalledTimes(2); // se intentaron los dos, ninguno bloqueó al otro
+  });
+});
+
+describe('actualizarAvatarEnMisViajes', () => {
+  it('actualiza la URL del avatar en cada viaje donde participas', async () => {
+    mockSelect.mockReturnValue({
+      eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }),
+    });
+    const eqSpy = jest.fn(() => Promise.resolve({ error: null }));
+    mockUpdate.mockReturnValue({ eq: eqSpy });
+
+    await actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg');
+
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    const urlsEnviadas = mockUpdate.mock.calls.map(
+      (c) => (c[0] as { usuarios: Record<string, { avatarUrl: string }> }).usuarios[USUARIO].avatarUrl
+    );
+    expect(urlsEnviadas).toEqual(['https://ejemplo.test/foto.jpg', 'https://ejemplo.test/foto.jpg']);
+  });
+
+  it('no escribe en un viaje si ya tenía esa URL', async () => {
+    const v = viaje(1, 'Cangas');
+    v.usuarios[USUARIO] = { ...v.usuarios[USUARIO], avatarUrl: 'https://ejemplo.test/foto.jpg' };
+    mockSelect.mockReturnValue({ eq: () => Promise.resolve({ data: [v], error: null }) });
+
+    await actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg');
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('si un viaje falla al escribir, los demás no se ven afectados y no revienta', async () => {
+    mockSelect.mockReturnValue({
+      eq: () => Promise.resolve({ data: [viaje(1, 'Cangas'), viaje(2, 'Oktoberfest')], error: null }),
+    });
+    let llamada = 0;
+    mockUpdate.mockReturnValue({
+      eq: () => {
+        llamada += 1;
+        return llamada === 1 ? Promise.reject(new Error('red caída')) : Promise.resolve({ error: null });
+      },
+    });
+
+    await expect(
+      actualizarAvatarEnMisViajes(USUARIO, 'https://ejemplo.test/foto.jpg')
+    ).resolves.toBeUndefined();
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
   });
 });

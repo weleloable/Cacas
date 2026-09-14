@@ -46,8 +46,6 @@ jest.mock('@/lib/viajes', () => {
     cargarMisViajes: (...args: unknown[]) => mockCargarMisViajes(...args),
     modificarEvento: (...args: unknown[]) => mockModificarEvento(...args),
     ConflictoDeConcurrencia,
-    totalDeUsuarioEnCategoria: (u: { eventos: Record<string, number> }, claves: string[]) =>
-      claves.reduce((suma, clave) => suma + (u.eventos?.[clave] ?? 0), 0),
   };
 });
 
@@ -348,30 +346,63 @@ describe('código del viaje: copiar y compartir', () => {
   });
 });
 
-describe('clasificación por categoría', () => {
-  it('separa la clasificación por cada categoría del viaje, no un total mezclado', async () => {
-    mockCargarMisViajes.mockResolvedValue([
-      {
-        ...viajeBase,
-        categorias: ['Gotitas', 'Bebidas'],
-        usuarios: {
-          [USUARIO]: {
-            nombre: 'Dudu',
-            eventos: { cacas: 3, pises: 1, cervezas: 5, vinos: 0, vermouths: 0, copazos: 0 },
-          },
-          OTRO: { nombre: 'Rodri', eventos: { cacas: 0, pises: 0, cervezas: 9 } },
+describe('clasificación por categoría, con subclasificación por evento', () => {
+  function viajeConDosUsuarios(usuarios: Record<string, unknown>) {
+    return [{ ...viajeBase, categorias: ['Gotitas', 'Bebidas'], usuarios }];
+  }
+
+  it('separa la clasificación por categoría Y por cada evento dentro de ella', async () => {
+    mockCargarMisViajes.mockResolvedValue(
+      viajeConDosUsuarios({
+        [USUARIO]: {
+          nombre: 'Dudu',
+          eventos: { cacas: 3, pises: 1, cervezas: 5, vinos: 0, vermouths: 0, copazos: 0 },
         },
-      },
-    ]);
+        OTRO: {
+          nombre: 'Rodri',
+          eventos: { cacas: 0, pises: 0, cervezas: 9, vinos: 0, vermouths: 1, copazos: 0 },
+        },
+      })
+    );
     await renderPantalla();
 
+    // Un encabezado por categoría...
     expect(screen.getByText('Clasificación · Gotitas')).toBeTruthy();
     expect(screen.getByText('Clasificación · Bebidas')).toBeTruthy();
+    // ...y una subclasificación por cada evento de esa categoría, no un total
+    // que mezcle cacas con pises o cerveza con vermú. Cada nombre de evento
+    // aparece dos veces: la tarjeta de contador de arriba y el título de su
+    // subclasificación.
+    for (const nombreEvento of ['Cacas', 'Pises', 'Cerveza', 'Copa de vino', 'Vermouth', 'Copazo']) {
+      expect(screen.getAllByText(nombreEvento).length).toBe(2);
+    }
 
-    // Dudu manda en Gotitas (3+1=4 contra 0 de Rodri)...
-    expect(screen.getByText('4')).toBeTruthy();
-    // ...pero Rodri manda en Bebidas (9 contra el 5 de Dudu), justo lo que un
-    // total único mezclado no distinguiría.
+    // Dudu manda en Cacas (3 contra 0), pero Rodri manda en Cerveza (9 contra
+    // 5 de Dudu): sólo se comprueba que "9" existe (aparece una sola vez, a
+    // diferencia de "3" que también es el contador de arriba), justo lo que
+    // una clasificación por categoría (que sumaría cerveza+vino+vermú+copazo)
+    // no distinguiría evento a evento.
     expect(screen.getByText('9')).toBeTruthy();
+  });
+
+  it('enseña la foto de quien la tiene y la inicial de quien no', async () => {
+    mockCargarMisViajes.mockResolvedValue(
+      viajeConDosUsuarios({
+        [USUARIO]: {
+          nombre: 'Dudu',
+          avatarUrl: 'https://ejemplo.test/dudu.jpg',
+          eventos: { cacas: 1, pises: 0 },
+        },
+        OTRO: { nombre: 'Rodri', eventos: { cacas: 0, pises: 0 } },
+      })
+    );
+    await renderPantalla();
+
+    // Rodri no tiene avatarUrl: cae a la inicial.
+    expect(screen.getAllByText('R').length).toBeGreaterThan(0);
+    // Dudu sí: se usa un <Image>, no la inicial "D" dentro de una fila de
+    // clasificación (la "D" del avatar grande de arriba del todo no existe
+    // en esta pantalla, sólo en Perfil).
+    expect(screen.queryByText('D')).toBeNull();
   });
 });

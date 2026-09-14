@@ -33,7 +33,11 @@ export const CATEGORIAS: Record<string, CategoriaInfo> = {
       cervezas: { nombre: 'Cerveza', icono: { fuente: 'mci', nombre: 'beer' } },
       vinos: { nombre: 'Copa de vino', icono: { fuente: 'mci', nombre: 'glass-wine' } },
       vermouths: { nombre: 'Vermouth', icono: { fuente: 'mci', nombre: 'glass-cocktail' } },
-      copazos: { nombre: 'Copazo', icono: { fuente: 'mci', nombre: 'glass-tulip' } },
+      // MCI no tiene un vaso de whisky/rocks propiamente dicho; `cup-outline`
+      // (ancho y bajo, sin pie) es lo más parecido que trae el set, y no se
+      // confunde con `glass-wine` (con pie, para vino) como pasaba con
+      // `glass-tulip`, que también lleva pie y parecía otra copa de vino.
+      copazos: { nombre: 'Copazo', icono: { fuente: 'mci', nombre: 'cup-outline' } },
     },
   },
 };

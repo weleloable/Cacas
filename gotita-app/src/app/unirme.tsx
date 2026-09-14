@@ -19,7 +19,7 @@ import { buscarPorCodigo, unirseAViaje } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
 
 export default function Unirme() {
-  const { userId, nombreUsuario } = useAuth();
+  const { userId, nombreUsuario, avatarUrl } = useAuth();
   const { setViajes, setViajeActivoId } = useViajes();
 
   const [codigo, setCodigo] = useState('');
@@ -44,7 +44,7 @@ export default function Unirme() {
         });
         return;
       }
-      const actualizado = await unirseAViaje(viaje, userId, nombreUsuario);
+      const actualizado = await unirseAViaje(viaje, userId, nombreUsuario, avatarUrl);
       // "Mi Viaje" lee del contexto compartido, no vuelve a pedir nada al
       // montarse (las pestañas no se desmontan al navegar entre ellas): sin
       // esto, el viaje recién unido no aparecía ahí hasta un pull-to-refresh.

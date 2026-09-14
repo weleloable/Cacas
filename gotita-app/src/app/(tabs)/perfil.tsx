@@ -19,7 +19,7 @@ import { elegirDeGaleria, hacerFoto, subirAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
 import { IconoDe, ICONOS } from '@/lib/iconos';
 import { radio, tema } from '@/lib/tema';
-import { actualizarNombreEnMisViajes } from '@/lib/viajes';
+import { actualizarAvatarEnMisViajes, actualizarNombreEnMisViajes } from '@/lib/viajes';
 import { useViajes } from '@/lib/viajesContext';
 
 /** La versión declarada en app.json (expo.version), leída vía expo-constants
@@ -52,14 +52,31 @@ export default function Perfil() {
     if (!uri) return; // canceló el selector o no dio permiso
 
     setSubiendoFoto(true);
+    let url: string;
     try {
-      const url = await subirAvatar(userId, uri);
+      url = await subirAvatar(userId, uri);
       await actualizarAvatar(url);
+    } catch (e) {
+      setSubiendoFoto(false);
+      setMensaje({
+        tipo: 'error',
+        texto: e instanceof Error ? e.message : 'No se ha podido subir la foto.',
+      });
+      return;
+    }
+    // Igual que con el nombre: la cuenta ya se guardó (pasos separados, no un
+    // único try), así que un fallo aquí no es "no se ha podido guardar" —
+    // sólo la copia dentro de los viajes ya existentes no llegó.
+    try {
+      await actualizarAvatarEnMisViajes(userId, url);
+      await recargar();
       setMensaje({ tipo: 'ok', texto: 'Foto de perfil actualizada.' });
     } catch (e) {
       setMensaje({
         tipo: 'error',
-        texto: e instanceof Error ? e.message : 'No se ha podido subir la foto.',
+        texto: `Se guardó la foto, pero no llegó a tus viajes ya existentes (${
+          e instanceof Error ? e.message : 'fallo de red'
+        }). La clasificación de esos viajes seguirá enseñando la foto anterior.`,
       });
     } finally {
       setSubiendoFoto(false);

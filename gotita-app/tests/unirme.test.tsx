@@ -40,8 +40,6 @@ jest.mock('@/lib/viajes', () => ({
   cargarMisViajes: (...a: unknown[]) => mockCargarMisViajes(...a),
   buscarPorCodigo: (...a: unknown[]) => mockBuscarPorCodigo(...a),
   unirseAViaje: (...a: unknown[]) => mockUnirseAViaje(...a),
-  totalDeUsuarioEnCategoria: (u: { eventos: Record<string, number> }, claves: string[]) =>
-    claves.reduce((suma, clave) => suma + (u.eventos?.[clave] ?? 0), 0),
 }));
 
 // Objeto estable a propósito: si el mock devolviera `{ user: {...} }` nuevo
@@ -56,6 +54,7 @@ jest.mock('@/lib/auth', () => ({
     session: SESION_ESTABLE,
     userId: USUARIO,
     nombreUsuario: 'Dudu',
+    avatarUrl: null,
     salir: jest.fn(),
     cargando: false,
   }),
@@ -125,7 +124,7 @@ describe('unirse a un viaje', () => {
       for (let i = 0; i < 6; i++) await Promise.resolve();
     });
 
-    expect(mockUnirseAViaje).toHaveBeenCalledWith(viajeNuevo, USUARIO, 'Dudu');
+    expect(mockUnirseAViaje).toHaveBeenCalledWith(viajeNuevo, USUARIO, 'Dudu', null);
     // Antes del arreglo esto seguía en "Cangas": unirseAViaje() escribía en
     // Supabase pero nadie avisaba al contexto compartido, y como las pestañas
     // no se desmontan al navegar, "Mi Viaje" nunca volvía a preguntar.
